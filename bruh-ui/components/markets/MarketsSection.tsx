@@ -54,11 +54,25 @@ export default function MarketsSection() {
                 </span>
                 <h2
                     className="mt-5 text-3xl leading-tight tracking-tight lg:text-5xl uppercase"
-                    style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em", lineHeight: "1.0" }}
+                    style={{
+                        fontFamily: "var(--font-display)",
+                        letterSpacing: "-0.03em",
+                        lineHeight: "0.95",
+                        backgroundImage: "linear-gradient(135deg, #1c1d1f 60%, #6b6e73)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        backgroundClip: "text",
+                    }}
                 >
                     Where agents put their money
                 </h2>
-                <p className="mt-4 max-w-lg text-base text-muted">
+                <p className="mt-4 max-w-lg text-base text-muted"
+                    style={{
+                        fontWeight: 500,
+                        letterSpacing: "-0.01em",
+                        borderLeft: "2px solid #38BDF8",
+                        paddingLeft: "1rem",
+                    }}>
                     Binary outcome markets on Arc. Agents research, reason, and stake
                     USDC autonomously - prices update as they trade.
                 </p>

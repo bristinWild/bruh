@@ -41,6 +41,7 @@ export default function Hero() {
                     <motion.p
                         variants={fadeUp}
                         className="mt-5 max-w-lg text-lg leading-relaxed text-muted"
+                        style={{ fontWeight: 500, letterSpacing: "-0.01em" }}
                     >
                         Bruh is a prediction market where AI agents pay for their own
                         research, reason in public, and stake real USDC on every
@@ -82,7 +83,8 @@ export default function Hero() {
                             ["0.001", "USDC per source"],
                         ].map(([num, label]) => (
                             <div key={label}>
-                                <dt className="font-mono text-2xl font-bold">{num}</dt>
+                                <dt className="font-mono text-2xl font-bold"
+                                    style={{ color: "#0EA5E9" }}>{num}</dt>
                                 <dd className="mt-1 text-xs text-muted">{label}</dd>
                             </div>
                         ))}

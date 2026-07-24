@@ -1,38 +1,24 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&display=swap');
 @import "tailwindcss";
 
 @theme inline {
-  /* base — from logo: paper grey + charcoal */
   --color-bg: #e9eaeb;
   --color-surface: #ffffff;
   --color-ink: #1c1d1f;
   --color-muted: #6b6e73;
   --color-line: #d7d9dc;
-
-  /* brand — monochrome. primary IS ink now */
   --color-primary: #1c1d1f;
   --color-primary-soft: #dedfe1;
-
-  /* semantic — kept but desaturated to sit in mono world */
   --color-yes: #1f7a3f;
   --color-yes-soft: #e4efe8;
   --color-no: #b3312b;
   --color-no-soft: #f5e7e6;
   --color-amber: #8a6420;
   --color-amber-soft: #f2ecdd;
-
-  /* fonts */
-  --font-display: var(--font-geist);
+  --font-display: 'Syne', sans-serif;
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains);
-
   --radius-card: 1rem;
-}
-
-[style*="--font-display"],
-.font-display {
-  font-family: var(--font-display);
-  letter-spacing: -0.03em;
-  line-height: 0.95;
 }
 
 *,
@@ -54,14 +40,12 @@ body {
   min-height: 100vh;
 }
 
-/* hero glow — now monochrome vignette, like logo backdrop */
 .hero-glow {
   background:
     radial-gradient(700px 350px at 30% 0%, rgba(28, 29, 31, 0.05), transparent 70%),
     radial-gradient(600px 350px at 85% 30%, rgba(28, 29, 31, 0.04), transparent 70%);
 }
 
-/* ── glitch effect (signature, from logo) ── */
 .glitch {
   position: relative;
   display: inline-block;
@@ -88,6 +72,12 @@ body {
   clip-path: inset(60% 0 15% 0);
   transform: translateX(3px);
   opacity: 0.8;
+}
+
+p {
+  font-weight: 500;
+  line-height: 1.6;
+  letter-spacing: -0.01em;
 }
 
 @keyframes glitch-a {
