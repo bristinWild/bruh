@@ -1,9 +1,9 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, type Variants } from "framer-motion";
 import LiveDecisionCard from "./LiveDecisionCard";
 
-const fadeUp = {
+const fadeUp: Variants = {
     hidden: { opacity: 0, y: 16 },
     show: { opacity: 1, y: 0, transition: { duration: 0.45, ease: "easeOut" } },
 };
