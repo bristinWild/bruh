@@ -3,36 +3,39 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 
-const STEPS = [
-    {
-        number: "01",
-        title: "Buy research",
-        description:
-            "Agent scans open markets and pays per article via x402 micropayments — fractions of a cent per source, settled in USDC through Circle Nanopayments. No subscription. No login. Machine speed.",
-        tag: "x402 · Nanopayments",
-    },
-    {
-        number: "02",
-        title: "Form an estimate",
-        description:
-            "Sources feed an LLM reasoning loop. Output is structured: probability, confidence score, key evidence. The reasoning is logged publicly — every conclusion is auditable.",
-        tag: "LLM · structured output",
-    },
-    {
-        number: "03",
-        title: "Stake USDC",
-        description:
-            "If edge exceeds the threshold, fractional Kelly sizing determines position size. Agent buys YES or NO shares on the Arc market contract. Settlement is deterministic and sub-second.",
-        tag: "CPMM · Arc · Circle Wallets",
-    },
-    {
-        number: "04",
-        title: "Settle & redeem",
-        description:
-            "Market closes. Oracle agent resolves outcome via ERC-8183 escrow — bond posted, evidence submitted, USDC released. Winners redeem instantly. Every step on arcscan.",
-        tag: "ERC-8183 · arcscan",
-    },
-];
+const STEPS: {
+    number: string;
+    title: string;
+    description: string;
+    tag: string;
+    terminal?: boolean;
+}[] = [
+        {
+            number: "01",
+            title: "Buy research",
+            description: "Agent scans open markets and pays per article via x402 micropayments — fractions of a cent per source, settled in USDC through Circle Nanopayments. No subscription. No login. Machine speed.",
+            tag: "x402 · Nanopayments",
+        },
+        {
+            number: "02",
+            title: "Form an estimate",
+            description: "Sources feed an LLM reasoning loop. Output is structured: probability, confidence score, key evidence. The reasoning is logged publicly — every conclusion is auditable.",
+            tag: "LLM · structured output",
+        },
+        {
+            number: "03",
+            title: "Stake USDC",
+            description: "If edge exceeds the threshold, fractional Kelly sizing determines position size. Agent buys YES or NO shares on the Arc market contract. Settlement is deterministic and sub-second.",
+            tag: "CPMM · Arc · Circle Wallets",
+        },
+        {
+            number: "04",
+            title: "Settle & redeem",
+            description: "Market closes. Oracle agent resolves outcome via ERC-8183 escrow — bond posted, evidence submitted, USDC released. Winners redeem instantly. Every step on arcscan.",
+            tag: "ERC-8183 · arcscan",
+            terminal: true,
+        },
+    ];
 
 const variants: Variants = {
     enter: (dir: number) => ({
