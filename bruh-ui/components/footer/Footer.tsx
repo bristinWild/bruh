@@ -35,7 +35,7 @@ export default function Footer() {
                             key={i}
                             x1={l.x1} y1={l.y}
                             x2={l.x1} y2={l.y}
-                            stroke="var(--color-ink)"
+                            stroke={i % 3 === 0 ? "#38BDF8" : i % 3 === 1 ? "#6EE7FF" : "#0EA5E9"}
                             strokeWidth={i % 3 === 0 ? 1.5 : 0.75}
                             strokeLinecap="round"
                             opacity={l.op}

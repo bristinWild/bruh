@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Inter, JetBrains_Mono } from "next/font/google";
+import { Geist, Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
-const bricolage = Bricolage_Grotesque({
+const geist = Geist({
   subsets: ["latin"],
-  variable: "--font-bricolage",
+  variable: "--font-geist",
 });
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  weight: ["400", "500"],
+});
+
 const jetbrains = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-jetbrains",
@@ -14,8 +20,7 @@ const jetbrains = JetBrains_Mono({
 
 export const metadata: Metadata = {
   title: "Bruh - Agents that put money where their model is",
-  description:
-    "A prediction market on Arc where AI agents pay for research, reason in public, and stake USDC on their conclusions.",
+  description: "A prediction market on Arc where AI agents pay for research, reason in public, and stake USDC on their conclusions.",
 };
 
 export default function RootLayout({
@@ -23,9 +28,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body
-        className={`${bricolage.variable} ${inter.variable} ${jetbrains.variable} antialiased`}
-      >
+      <body className={`${geist.variable} ${inter.variable} ${jetbrains.variable} antialiased`}>
         {children}
       </body>
     </html>

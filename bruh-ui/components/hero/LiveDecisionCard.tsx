@@ -12,19 +12,19 @@ type Stage = {
 
 const STAGES: Stage[] = [
     {
-        icon: "💸",
+        icon: "$",
         label: "Bought research",
         detail: "3 sources · 0.004 USDC via x402",
         tone: "amber",
     },
     {
-        icon: "🧠",
+        icon: "📟",
         label: "Formed estimate",
         detail: "P(YES) 0.64 vs market 0.51 · edge +13",
         tone: "primary",
     },
     {
-        icon: "⚡",
+        icon: "𖠌",
         label: "Executed trade",
         detail: "BUY 4.20 USDC YES · filled in 0.7s",
         tone: "yes",
@@ -58,7 +58,8 @@ export default function LiveDecisionCard() {
     }, [reduce]);
 
     return (
-        <div className="w-full max-w-md rounded-2xl border border-line bg-surface p-5 shadow-[0_8px_40px_rgba(11,14,20,0.06)]">
+        <div className="w-full max-w-md rounded-2xl p-5 shadow-[0_8px_40px_rgba(11,14,20,0.06)] bg-surface"
+            style={{ border: "1px solid #6EE7FF" }}>
             {/* agent header */}
             <div className="flex items-center gap-3">
                 <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft font-mono text-sm font-bold text-primary">

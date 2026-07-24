@@ -76,7 +76,8 @@ function VisualPanel({ yes }: { yes: number }) {
                     whileInView={{ opacity: 1, scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ type: "spring", stiffness: 100, damping: 16 }}
-                    className="font-mono text-6xl font-bold tracking-tight text-ink"
+                    className="font-mono text-6xl font-bold tracking-tight"
+                    style={{ color: "#0EA5E9" }}
                 >
                     {yes}%
                 </motion.span>
@@ -85,7 +86,7 @@ function VisualPanel({ yes }: { yes: number }) {
                 </span>
                 <div className="mt-4 flex h-1.5 w-40 overflow-hidden rounded-full bg-line">
                     <motion.div
-                        className="bg-ink"
+                        style={{ background: "#38BDF8" }}
                         initial={{ width: 0 }}
                         whileInView={{ width: `${yes}%` }}
                         viewport={{ once: true }}
@@ -111,8 +112,22 @@ export default function MarketCard({
     return (
         <motion.div
             ref={cardRef}
-            style={{ scale, rotateY, opacity, transformPerspective: 1200 }}
-            className="flex w-[340px] shrink-0 snap-center flex-col rounded-2xl border border-line bg-surface p-4 will-change-transform sm:w-[380px]"
+            className="flex w-[340px] shrink-0 snap-center flex-col rounded-2xl p-4 will-change-transform sm:w-[380px] bg-surface transition-all"
+            style={{
+                scale,
+                rotateY,
+                opacity,
+                transformPerspective: 1200,
+                border: "1px solid #6EE7FF",
+            }}
+            onMouseEnter={e => {
+                e.currentTarget.style.borderColor = "#22D3EE";
+                e.currentTarget.style.boxShadow = "0 4px 24px rgba(110,231,255,0.15)";
+            }}
+            onMouseLeave={e => {
+                e.currentTarget.style.borderColor = "#6EE7FF";
+                e.currentTarget.style.boxShadow = "none";
+            }}
         >
             <VisualPanel yes={yes} />
 
@@ -132,7 +147,10 @@ export default function MarketCard({
                 </p>
 
                 <div className="mt-auto pt-5">
-                    <button className="rounded-full bg-ink px-5 py-2.5 text-[13px] font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                    <button className="rounded-full px-5 py-2.5 text-[13px] font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                        style={{ background: "#38BDF8" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#0EA5E9")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "#38BDF8")}>
                         View market
                     </button>
                 </div>

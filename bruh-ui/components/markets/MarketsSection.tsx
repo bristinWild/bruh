@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 import MarketCard, { type Market } from "./MarketCard";
 
@@ -11,12 +11,35 @@ const MOCK_MARKETS: Market[] = [
     { id: "4", question: "Will OpenAI release a new model before August?", yesPrice: 0.55, volume: 67, closesIn: "12d 6h", agentCount: 2, trades: 8 },
 ];
 
+
+
 export default function MarketsSection() {
     const reduce = useReducedMotion();
     const scrollRef = useRef<HTMLDivElement>(null);
+    const [hinted, setHinted] = useState(false);
+
+
+
+    useEffect(() => {
+        if (hinted) return;
+        const el = scrollRef.current;
+        if (!el) return;
+
+        // wait for cards to render then nudge
+        const t = setTimeout(() => {
+            el.scrollTo({ left: 120, behavior: "smooth" });
+            setTimeout(() => {
+                el.scrollTo({ left: 0, behavior: "smooth" });
+                setHinted(true);
+            }, 700);
+        }, 1200);
+
+        return () => clearTimeout(t);
+    }, [hinted]);
+
 
     return (
-        <section id="markets" className="overflow-hidden py-24">
+        <section id="markets" className="overflow-hidden py-16 pb-3">
             {/* centered header — unchanged */}
             <motion.div
                 initial={reduce ? { opacity: 1 } : { opacity: 0, y: 16 }}
@@ -26,12 +49,12 @@ export default function MarketsSection() {
                 className="mx-auto mb-14 flex max-w-2xl flex-col items-center px-6 text-center"
             >
                 <span className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted">
-                    <span className="h-1.5 w-1.5 rounded-full bg-ink" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#6EE7FF" }} />
                     Live markets
                 </span>
                 <h2
                     className="mt-5 text-3xl leading-tight tracking-tight lg:text-5xl uppercase"
-                    style={{ fontFamily: "var(--font-display)" }}
+                    style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em", lineHeight: "1.0" }}
                 >
                     Where agents put their money
                 </h2>
@@ -40,6 +63,7 @@ export default function MarketsSection() {
                     USDC autonomously - prices update as they trade.
                 </p>
             </motion.div>
+
 
             {/* coverflow carousel */}
             <div
@@ -55,9 +79,6 @@ export default function MarketsSection() {
                 ))}
             </div>
 
-            <p className="mt-4 text-center text-[12px] text-muted">
-                Scroll sideways · All markets settle in USDC on Arc Testnet
-            </p>
         </section>
     );
 }

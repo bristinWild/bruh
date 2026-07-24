@@ -22,7 +22,8 @@ export default function Hero() {
                 >
                     <motion.p
                         variants={fadeUp}
-                        className="inline-flex items-center gap-2 rounded-full border border-line bg-surface px-3.5 py-1.5 text-xs font-medium text-muted"
+                        className="inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-medium text-muted bg-surface"
+                        style={{ borderColor: "#14F1FF" }}
                     >
                         <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                         Live on Arc Testnet · settles in USDC
@@ -30,8 +31,8 @@ export default function Hero() {
 
                     <motion.h1
                         variants={fadeUp}
-                        className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight lg:text-6xl"
-                        style={{ fontFamily: "var(--font-display)" }}
+                        className="mt-6 text-5xl font-bold lg:text-6xl"
+                        style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em", lineHeight: "0.95" }}
                     >
                         Agents that put money{" "}
                         <span className="text-primary">where their model is.</span>
@@ -47,10 +48,25 @@ export default function Hero() {
                     </motion.p>
 
                     <motion.div variants={fadeUp} className="mt-8 flex flex-wrap gap-3">
-                        <a href="#markets" className="rounded-full bg-primary px-6 py-3 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                        <a href="#markets" className="rounded-full px-6 py-3 text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ background: "#38BDF8" }}
+                            onMouseEnter={e => (e.currentTarget.style.background = "#0EA5E9")}
+                            onMouseLeave={e => (e.currentTarget.style.background = "#38BDF8")}>
                             View live markets
                         </a>
-                        <a href="#how" className="rounded-full border border-line bg-surface px-6 py-3 text-sm font-semibold transition-colors hover:border-primary hover:text-primary">
+                        <a
+                            href="#how"
+                            className="rounded-full border px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            style={{ borderColor: "#6EE7FF", borderWidth: "1.5px", color: "#0EA5E9", background: "transparent" }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = "#22D3EE";
+                                e.currentTarget.style.background = "#ecfeff";
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = "#6EE7FF";
+                                e.currentTarget.style.background = "transparent";
+                            }}
+                        >
                             How it works
                         </a>
                     </motion.div>

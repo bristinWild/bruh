@@ -145,12 +145,12 @@ export default function HowItWorks() {
                 className="mx-auto mb-16 flex max-w-2xl flex-col items-center px-6 text-center"
             >
                 <span className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted">
-                    <span className="h-1.5 w-1.5 rounded-full bg-ink" />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#6EE7FF" }} />
                     How it works
                 </span>
                 <h2
                     className="mt-5 text-3xl leading-tight tracking-tight lg:text-5xl uppercase"
-                    style={{ fontFamily: "var(--font-display)" }}
+                    style={{ fontFamily: "var(--font-display)", letterSpacing: "-0.03em", lineHeight: "1.0" }}
                 >
                     Four steps. Zero humans.
                 </h2>
@@ -168,10 +168,12 @@ export default function HowItWorks() {
                         <button
                             key={s.number}
                             onClick={() => go(i)}
-                            className={`transition-all duration-300 rounded-full ${i === active
-                                ? "w-8 h-2 bg-ink"
-                                : "w-2 h-2 bg-line hover:bg-muted"
-                                }`}
+                            className="transition-all duration-300 rounded-full"
+                            style={{
+                                width: i === active ? "2rem" : "0.5rem",
+                                height: "0.5rem",
+                                background: i === active ? "#38BDF8" : "var(--color-line)",
+                            }}
                         />
                     ))}
                 </div>
@@ -219,10 +221,12 @@ export default function HowItWorks() {
 
                             {/* tag */}
                             <span
-                                className={`mt-8 inline-block rounded-full px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider ${isLast
-                                    ? "bg-white/10 text-surface"
-                                    : "bg-primary-soft text-ink"
-                                    }`}
+                                className="mt-8 inline-block rounded-full px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
+                                style={
+                                    step.terminal
+                                        ? { background: "rgba(255,255,255,0.1)", color: "var(--color-surface)" }
+                                        : { background: "#ecfeff", color: "#0EA5E9", border: "1px solid #6EE7FF" }
+                                }
                             >
                                 {step.tag}
                             </span>
@@ -230,7 +234,8 @@ export default function HowItWorks() {
                             {/* progress bar */}
                             <div className="mt-8 h-px w-full bg-line overflow-hidden rounded-full">
                                 <motion.div
-                                    className={`h-full rounded-full ${isLast ? "bg-surface" : "bg-ink"}`}
+                                    className="h-full rounded-full"
+                                    style={{ background: step.terminal ? "var(--color-surface)" : "#38BDF8" }}
                                     initial={false}
                                     animate={{ width: `${((active + 1) / STEPS.length) * 100}%` }}
                                     transition={{ duration: 0.4, ease: "easeOut" }}
@@ -245,7 +250,15 @@ export default function HowItWorks() {
                     <button
                         onClick={() => go(active - 1)}
                         disabled={active === 0}
-                        className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition-all hover:border-ink disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        onMouseEnter={e => {
+                            e.currentTarget.style.borderColor = "#22D3EE";
+                            e.currentTarget.style.color = "#0EA5E9";
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.borderColor = "var(--color-line)";
+                            e.currentTarget.style.color = "var(--color-ink)";
+                        }}
                     >
                         ← Prev
                     </button>
@@ -255,7 +268,10 @@ export default function HowItWorks() {
                     <button
                         onClick={() => go(active + 1)}
                         disabled={active === STEPS.length - 1}
-                        className="rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface transition-all hover:opacity-80 disabled:opacity-30 disabled:cursor-not-allowed"
+                        className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                        style={{ background: "#38BDF8" }}
+                        onMouseEnter={e => (e.currentTarget.style.background = "#0EA5E9")}
+                        onMouseLeave={e => (e.currentTarget.style.background = "#38BDF8")}
                     >
                         Next →
                     </button>

@@ -21,11 +21,18 @@
   --color-amber-soft: #f2ecdd;
 
   /* fonts */
-  --font-display: var(--font-archivo-black);
-  --font-sans: var(--font-archivo);
+  --font-display: var(--font-geist);
+  --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains);
 
   --radius-card: 1rem;
+}
+
+[style*="--font-display"],
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.03em;
+  line-height: 0.95;
 }
 
 *,
