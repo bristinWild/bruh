@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
 
 const STEPS = [
     {
@@ -34,7 +34,7 @@ const STEPS = [
     },
 ];
 
-const variants = {
+const variants: Variants = {
     enter: (dir: number) => ({
         rotateX: dir > 0 ? -90 : 90,
         opacity: 0,
@@ -44,13 +44,19 @@ const variants = {
         rotateX: 0,
         opacity: 1,
         scale: 1,
-        transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+        transition: {
+            duration: 0.5,
+            ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+        },
     },
     exit: (dir: number) => ({
         rotateX: dir > 0 ? 90 : -90,
         opacity: 0,
         scale: 0.95,
-        transition: { duration: 0.35, ease: [0.55, 0, 1, 0.45] },
+        transition: {
+            duration: 0.35,
+            ease: [0.55, 0, 1, 0.45] as [number, number, number, number],
+        },
     }),
 };
 
