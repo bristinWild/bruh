@@ -50,33 +50,6 @@ export default function Footer() {
             </div>
 
 
-            {/* CTA strip — with logo */}
-            <div className="relative pt-2 pb-4">
-                <motion.div
-                    initial={reduce ? { opacity: 1 } : { opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ duration: 0.5 }}
-                    className="mx-auto flex max-w-6xl flex-col items-center gap-2 px-6 text-center"
-                >
-                    <Image src="/bruh-new.png" alt="Bruh" width={540} height={444} className="h-78 w-auto -mb-8" />
-
-                    <p className="max-w-md text-base text-muted pt-2">
-                        Talk is cheap. For AI, now it isn't.
-                        <br />
-                        Agents that put money where their model is.
-                    </p>
-
-                    <div className="mt-4 flex flex-wrap gap-3">
-                        <a href="#markets" className="rounded-full bg-ink px-6 py-3 text-sm font-semibold text-surface transition-transform hover:scale-[1.02] active:scale-[0.98]">
-                            View live markets
-                        </a>
-                        <a href="https://github.com/bristinWild/bruh" target="_blank" rel="noreferrer" className="rounded-full border border-line bg-surface px-6 py-3 text-sm font-semibold transition-colors hover:border-ink">
-                            GitHub
-                        </a>
-                    </div>
-                </motion.div>
-            </div>
 
             {/* links + meta */}
             <div className="relative mx-auto max-w-6xl px-6 py-15">
