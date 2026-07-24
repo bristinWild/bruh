@@ -1,0 +1,161 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* base — from logo: paper grey + charcoal */
+  --color-bg: #e9eaeb;
+  --color-surface: #ffffff;
+  --color-ink: #1c1d1f;
+  --color-muted: #6b6e73;
+  --color-line: #d7d9dc;
+
+  /* brand — monochrome. primary IS ink now */
+  --color-primary: #1c1d1f;
+  --color-primary-soft: #dedfe1;
+
+  /* semantic — kept but desaturated to sit in mono world */
+  --color-yes: #1f7a3f;
+  --color-yes-soft: #e4efe8;
+  --color-no: #b3312b;
+  --color-no-soft: #f5e7e6;
+  --color-amber: #8a6420;
+  --color-amber-soft: #f2ecdd;
+
+  /* fonts */
+  --font-display: var(--font-archivo-black);
+  --font-sans: var(--font-archivo);
+  --font-mono: var(--font-jetbrains);
+
+  --radius-card: 1rem;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+}
+
+/* hero glow — now monochrome vignette, like logo backdrop */
+.hero-glow {
+  background:
+    radial-gradient(700px 350px at 30% 0%, rgba(28, 29, 31, 0.05), transparent 70%),
+    radial-gradient(600px 350px at 85% 30%, rgba(28, 29, 31, 0.04), transparent 70%);
+}
+
+/* ── glitch effect (signature, from logo) ── */
+.glitch {
+  position: relative;
+  display: inline-block;
+}
+
+.glitch::before,
+.glitch::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.glitch::before {
+  animation: glitch-a 3.2s infinite steps(1);
+  clip-path: inset(20% 0 55% 0);
+  transform: translateX(-3px);
+  opacity: 0.8;
+}
+
+.glitch::after {
+  animation: glitch-b 2.7s infinite steps(1);
+  clip-path: inset(60% 0 15% 0);
+  transform: translateX(3px);
+  opacity: 0.8;
+}
+
+@keyframes glitch-a {
+
+  0%,
+  91%,
+  100% {
+    clip-path: inset(0 0 100% 0);
+  }
+
+  92% {
+    clip-path: inset(15% 0 60% 0);
+    transform: translateX(-4px);
+  }
+
+  95% {
+    clip-path: inset(40% 0 30% 0);
+    transform: translateX(-2px);
+  }
+
+  97% {
+    clip-path: inset(65% 0 10% 0);
+    transform: translateX(-5px);
+  }
+}
+
+@keyframes glitch-b {
+
+  0%,
+  89%,
+  100% {
+    clip-path: inset(0 0 100% 0);
+  }
+
+  90% {
+    clip-path: inset(55% 0 20% 0);
+    transform: translateX(4px);
+  }
+
+  93% {
+    clip-path: inset(25% 0 50% 0);
+    transform: translateX(2px);
+  }
+
+  96% {
+    clip-path: inset(70% 0 5% 0);
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .glitch::before,
+  .glitch::after {
+    display: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 99px;
+}
+
+.scrollbar-none {
+  scrollbar-width: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
