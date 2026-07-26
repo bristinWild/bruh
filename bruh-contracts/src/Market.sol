@@ -44,7 +44,16 @@ import {Pausable}      from "@openzeppelin/contracts/utils/Pausable.sol";
 /// │  · Slippage protection on every trade                                  │
 /// │  · Custom errors (gas-efficient, no string revert data)                │
 /// │  · Integer-only math, no floating point                                │
-/// │  · Input validation on construction                                    │
+/// │  · Input validation on construction
+
+/// │  ARC NOTES                                                              │
+/// │  · All transfers use the 6-decimal ERC-20 USDC interface               │
+/// │  · No native sends, no selfdestruct, no onchain randomness             │
+/// │  · block.timestamp used only at hour/day granularity (Arc timestamps   │
+/// │    are non-decreasing, not strictly increasing)                        │
+/// │  · USDC blocklist: a blocklisted winner's redeem() reverts for them    │
+/// │    only; per-user pull pattern isolates the failure                    │
+/// │  · skim() recovers native-USDC surplus (selfdestruct endowments)       │                                    │
 /// └─────────────────────────────────────────────────────────────────────────┘
 
 contract Market is ReentrancyGuard, Pausable {
@@ -206,6 +215,8 @@ contract Market is ReentrancyGuard, Pausable {
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
 
     event FeeUpdated(uint256 oldBps, uint256 newBps);
+
+
 
     // Errors
 
@@ -641,6 +652,22 @@ contract Market is ReentrancyGuard, Pausable {
         emit FeesWithdrawn(treasury, amount);
     }
 
+    /// @notice Sweep untracked USDC surplus to the treasury.
+    /// @dev    ARC-SPECIFIC: on Arc, a contract's USDC *is* its native balance.
+    ///         SELFDESTRUCT endowments or direct native sends can credit this
+    ///         contract outside our accounting (collateral + accruedFees).
+    ///         This recovers that surplus instead of locking it forever.
+    ///         Note: balanceOf() is the 6-decimal truncated view of the native
+    ///         balance, which matches our accounting units exactly.
+    function skim() external nonReentrant returns (uint256 surplus) {
+        uint256 tracked = collateral + accruedFees;
+        uint256 balance = usdc.balanceOf(address(this));
+        if (balance <= tracked) revert NothingToWithdraw();
+        surplus = balance - tracked;
+        usdc.safeTransfer(treasury, surplus);
+        emit FeesWithdrawn(treasury, surplus);
+    }
+
     
     // Views
 
@@ -652,8 +679,8 @@ contract Market is ReentrancyGuard, Pausable {
 
     /// @notice Current NO probability as a WAD.
     function noPrice() external view returns (uint256) {
-        return _mulDiv(reserveYes, PRECISION, reserveYes + reserveNo);
-    }
+    return _mulDiv(reserveNo, PRECISION, reserveYes + reserveNo);
+}
 
     /// @notice Preview the outcome of a buy without executing it.
     ///
@@ -747,9 +774,9 @@ contract Market is ReentrancyGuard, Pausable {
    
 
     /// @dev YES price as WAD: N / (Y + N) × 1e18
-    function _yesPrice() internal view returns (uint256) {
-        return _mulDiv(reserveNo, PRECISION, reserveYes + reserveNo);
-    }
+   function _yesPrice() internal view returns (uint256) {
+    return _mulDiv(reserveYes, PRECISION, reserveYes + reserveNo);
+}
 
     /// @dev Overflow-safe (a × b) / c using Solidity 0.8 checked arithmetic.
     ///      For production, replace with OZ Math.mulDiv for full 512-bit safety.

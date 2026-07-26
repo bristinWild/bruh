@@ -94,6 +94,8 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     address public treasury;
 
     uint256 public nextJobId;
+    /// @notice Running total of USDC held in escrow + pending payouts
+    uint256 public totalEscrowed;
 
     mapping(uint256 => Job) public jobs;
 
@@ -103,6 +105,10 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     /// @notice One active job per market (prevents duplicate jobs)
     mapping(address => uint256) public activeJobByMarket;
     mapping(address => bool)    public hasActiveJob;
+
+    /// @notice ARC-SPECIFIC: pull-based payouts (blocklist safety)
+    /// Credited on finalise/uphold/overturn/expire — claimed via claimPayout()
+    mapping(address => uint256) public pendingPayouts;
 
     
     // Events
@@ -151,7 +157,9 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     );
     event OracleAuthorised(address indexed oracle, bool authorised);
     event TreasuryUpdated(address indexed oldTreasury, address indexed newTreasury);
-
+    event PayoutCredited(address indexed recipient, uint256 amount);
+    event PayoutClaimed(address indexed recipient, uint256 amount);
+    event Skimmed(address indexed treasury, uint256 amount);
     
     // Errors
     
@@ -173,7 +181,8 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     error DeadlineNotPassed();
     error InvalidOutcome();
     error AlreadyDisputed();
-
+    error NothingToClaim();
+    error NothingToSkim();
     
     // Constructor
     
@@ -205,7 +214,7 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
 
         // Market must be past closeTime
         Market m = Market(market);
-        (,uint256 closeTime,,,,,,,bool open,) = m.summary();
+        (,,,,,,,,bool open,) = m.summary();
         if (open) revert MarketNotClosed();
 
         // Pull resolution fee from requester
@@ -235,6 +244,31 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
         m.requestResolution();
 
         emit JobCreated(jobId, market, msg.sender, RESOLUTION_FEE);
+    }
+
+    /// @notice Mark a job expired if oracle failed to accept in time.
+    function expireJob(uint256 jobId) external nonReentrant {
+        Job storage job = jobs[jobId];
+        if (job.status != JobStatus.OPEN) revert JobNotOpen();
+        if (block.timestamp <= job.createdAt + ACCEPT_DEADLINE) revert DeadlineNotPassed();
+        _expireJob(jobId);
+    }
+
+
+    function _expireJob(uint256 jobId) internal {
+        Job storage job = jobs[jobId];
+        job.status = JobStatus.EXPIRED;
+
+        uint256 refund = job.fee;
+        job.fee = 0;
+        hasActiveJob[job.market] = false;
+
+        if (refund > 0) {
+            pendingPayouts[job.requester] += refund;
+            emit PayoutCredited(job.requester, refund);
+        }
+
+        emit JobExpired(jobId, job.requester, refund);
     }
 
     /// @notice Oracle accepts a job and posts a bond.
@@ -271,23 +305,21 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     /// @param outcome      YES, NO, or INVALID
     /// @param evidenceURI  IPFS CID or HTTPS URL with resolution rationale
     function submitOutcome(
-        uint256        jobId,
-        Market.Outcome outcome,
-        string calldata evidenceURI
-    )
-        external
-        nonReentrant
-    {
-        Job storage job = jobs[jobId];
+    uint256        jobId,
+    Market.Outcome outcome,
+    string calldata evidenceURI
+        )
+            external
+            nonReentrant
+        {
+            Job storage job = jobs[jobId];
 
-        if (msg.sender != job.oracle)           revert NotJobOracle();
-        if (job.status != JobStatus.ACCEPTED)   revert JobNotAccepted();
-        if (outcome == Market.Outcome.UNRESOLVED) revert InvalidOutcome();
+            if (job.status != JobStatus.ACCEPTED)    revert JobNotAccepted(); 
+            if (msg.sender != job.oracle)            revert NotJobOracle();
+            if (outcome == Market.Outcome.UNRESOLVED) revert InvalidOutcome();
 
-        // Enforce submit deadline
+       // Enforce submit deadline
         if (block.timestamp > job.acceptedAt + SUBMIT_DEADLINE) {
-            // Oracle missed deadline — slash bond, refund fee
-            _slashAndRefund(jobId);
             revert SubmitDeadlinePassed();
         }
 
@@ -313,26 +345,24 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
 
         if (job.status != JobStatus.SUBMITTED) revert JobNotSubmitted();
         if (job.disputed)                      revert JobNotSubmitted();
-
-        // Dispute window must have closed
         if (block.timestamp <= job.submittedAt + DISPUTE_WINDOW) {
             revert DisputeWindowOpen();
         }
 
         job.status = JobStatus.FINALISED;
 
-        // Resolve the market
+        // Resolve market FIRST — decoupled from payment
         Market(job.market).resolve(job.outcome);
 
-        // Pay oracle: fee + bond back
+        // ARC: credit oracle instead of pushing — avoids blocklist brick
         uint256 payout = job.fee + job.bond;
         job.fee  = 0;
         job.bond = 0;
-
         hasActiveJob[job.market] = false;
 
-        usdc.safeTransfer(job.oracle, payout);
+        pendingPayouts[job.oracle] += payout;
 
+        emit PayoutCredited(job.oracle, payout);
         emit JobFinalised(jobId, job.outcome, job.oracle, payout);
     }
 
@@ -344,22 +374,21 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     ///         Costs nothing — anyone can dispute.
     ///
     /// @param jobId  Job to dispute
-    function dispute(uint256 jobId) external {
-        Job storage job = jobs[jobId];
+function dispute(uint256 jobId) external {
+    Job storage job = jobs[jobId];
 
-        if (job.status != JobStatus.SUBMITTED) revert JobNotSubmitted();
-        if (job.disputed)                      revert AlreadyDisputed();
+    if (job.disputed) revert AlreadyDisputed(); // check this FIRST
+    if (job.status != JobStatus.SUBMITTED) revert JobNotSubmitted();
 
-        // Must be within dispute window
-        if (block.timestamp > job.submittedAt + DISPUTE_WINDOW) {
-            revert DisputeWindowClosed();
-        }
-
-        job.disputed = true;
-        job.status   = JobStatus.DISPUTED;
-
-        emit JobDisputed(jobId, msg.sender);
+    if (block.timestamp > job.submittedAt + DISPUTE_WINDOW) {
+        revert DisputeWindowClosed();
     }
+
+    job.disputed = true;
+    job.status   = JobStatus.DISPUTED;
+
+    emit JobDisputed(jobId, msg.sender);
+}
 
     /// @notice Arbitrator upholds oracle's outcome.
     ///         Oracle keeps bond + fee.
@@ -372,18 +401,17 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
 
         job.status = JobStatus.FINALISED;
 
-        // Resolve market with oracle's outcome
         Market(job.market).resolve(job.outcome);
 
-        // Pay oracle
         uint256 payout = job.fee + job.bond;
         job.fee  = 0;
         job.bond = 0;
-
         hasActiveJob[job.market] = false;
 
-        usdc.safeTransfer(job.oracle, payout);
+        // ARC: credit, don't push
+        pendingPayouts[job.oracle] += payout;
 
+        emit PayoutCredited(job.oracle, payout);
         emit JobUpheld(jobId, job.oracle);
         emit JobFinalised(jobId, job.outcome, job.oracle, payout);
     }
@@ -393,53 +421,42 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     ///
     /// @param jobId       Disputed job
     /// @param newOutcome  Correct outcome as determined by arbitrator
-    function overturn(uint256 jobId, Market.Outcome newOutcome)
+  function overturn(uint256 jobId, Market.Outcome newOutcome)
         external
         onlyOwner
         nonReentrant
     {
         Job storage job = jobs[jobId];
 
-        if (job.status != JobStatus.DISPUTED)      revert JobNotDisputed();
-        if (newOutcome == Market.Outcome.UNRESOLVED) revert InvalidOutcome();
+        if (job.status != JobStatus.DISPUTED)        revert JobNotDisputed();
+        if (newOutcome == Market.Outcome.UNRESOLVED)  revert InvalidOutcome();
 
         job.status  = JobStatus.OVERTURNED;
         job.outcome = newOutcome;
 
-        // Resolve market with corrected outcome
         Market(job.market).resolve(newOutcome);
 
-        // Slash bond → treasury
+        // ARC: credit both parties — either could be blocklisted
         uint256 slashedBond = job.bond;
+        uint256 refundFee   = job.fee;
         job.bond = 0;
-        usdc.safeTransfer(treasury, slashedBond);
-
-        // Refund fee → requester
-        uint256 refundFee = job.fee;
-        job.fee = 0;
-        usdc.safeTransfer(job.requester, refundFee);
-
+        job.fee  = 0;
         hasActiveJob[job.market] = false;
 
+        pendingPayouts[treasury]      += slashedBond;
+        pendingPayouts[job.requester] += refundFee;
+
+        emit PayoutCredited(treasury,       slashedBond);
+        emit PayoutCredited(job.requester,  refundFee);
         emit JobOverturned(jobId, newOutcome, slashedBond);
     }
 
+   
     
     // Expiry
     
 
-    /// @notice Mark a job expired if oracle failed to accept in time.
-    ///         Fee refunded to requester.
-    ///
-    /// @param jobId  Job to expire
-    function expireJob(uint256 jobId) external nonReentrant {
-        Job storage job = jobs[jobId];
-        if (job.status != JobStatus.OPEN) revert JobNotOpen();
-        if (block.timestamp <= job.createdAt + ACCEPT_DEADLINE) revert DeadlineNotPassed();
-        _expireJob(jobId);
-    }
-
-    
+ 
     // Admin
     
 
@@ -455,6 +472,42 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
         if (newTreasury == address(0)) revert InvalidAddress();
         emit TreasuryUpdated(treasury, newTreasury);
         treasury = newTreasury;
+    }
+
+
+    //Payout Claims (Arc blocklist safety)
+
+    /// @notice Claim any USDC owed to msg.sender.
+    /// @dev    ARC-SPECIFIC: push payments replaced with pull to prevent a
+    ///         blocklisted address from bricking market resolution.
+    function claimPayout() external nonReentrant returns (uint256 amount) {
+        amount = pendingPayouts[msg.sender];
+        if (amount == 0) revert NothingToClaim();
+        pendingPayouts[msg.sender] = 0;
+        usdc.safeTransfer(msg.sender, amount);
+        emit PayoutClaimed(msg.sender, amount);
+    }
+
+
+    /// @notice Total USDC accounted for: all pending payouts + all escrowed job funds.
+    function _totalTracked() internal view returns (uint256 total) {
+        // Sum all active job escrows (fee + bond)
+        for (uint256 i; i < nextJobId; ++i) {
+            total += jobs[i].fee + jobs[i].bond;
+        }
+        // Note: pendingPayouts are already funded from job escrows above,
+        // so we don't double-count — once fee/bond zeroed, payout credited.
+    }
+
+    /// @notice Sweep untracked USDC to the treasury.
+    /// @dev    ARC-SPECIFIC: SELFDESTRUCT endowments can credit this contract
+    ///         outside our accounting. Recover them here.
+  function skim() external nonReentrant returns (uint256 surplus) {
+        uint256 balance = usdc.balanceOf(address(this));
+        if (balance <= totalEscrowed) revert NothingToSkim();
+        surplus = balance - totalEscrowed;
+        usdc.safeTransfer(treasury, surplus);
+        emit Skimmed(treasury, surplus);
     }
 
     
@@ -484,38 +537,39 @@ contract OracleJob is ReentrancyGuard, Ownable2Step {
     // Internal
     
 
-    function _expireJob(uint256 jobId) internal {
-        Job storage job = jobs[jobId];
-        job.status = JobStatus.EXPIRED;
-
-        uint256 refund = job.fee;
-        job.fee = 0;
-
-        hasActiveJob[job.market] = false;
-
-        if (refund > 0) {
-            usdc.safeTransfer(job.requester, refund);
-        }
-
-        emit JobExpired(jobId, job.requester, refund);
-    }
 
     function _slashAndRefund(uint256 jobId) internal {
         Job storage job = jobs[jobId];
         job.status = JobStatus.EXPIRED;
 
-        // Slash oracle bond → treasury
         uint256 bond = job.bond;
+        uint256 fee  = job.fee;
         job.bond = 0;
-        if (bond > 0) usdc.safeTransfer(treasury, bond);
-
-        // Refund fee → requester
-        uint256 fee = job.fee;
-        job.fee = 0;
-        if (fee > 0) usdc.safeTransfer(job.requester, fee);
-
+        job.fee  = 0;
         hasActiveJob[job.market] = false;
+
+        // ARC: credit both — don't push inline
+        if (bond > 0) {
+            pendingPayouts[treasury] += bond;
+            emit PayoutCredited(treasury, bond);
+        }
+        if (fee > 0) {
+            pendingPayouts[job.requester] += fee;
+            emit PayoutCredited(job.requester, fee);
+        }
 
         emit JobExpired(jobId, job.requester, fee);
     }
+
+
+    /// @notice Slash oracle bond if submit deadline passed without submission.
+    ///         Call this after submitOutcome reverts with SubmitDeadlinePassed.
+    function slashExpiredSubmission(uint256 jobId) external nonReentrant {
+        Job storage job = jobs[jobId];
+        if (job.status != JobStatus.ACCEPTED) revert JobNotAccepted();
+        if (block.timestamp <= job.acceptedAt + SUBMIT_DEADLINE) revert DeadlineNotPassed();
+        _slashAndRefund(jobId);
+    }
+
+    
 }

@@ -167,15 +167,12 @@ contract MarketTest is Test {
         assertEq(market.totalSharesNo(), sharesOut);
     }
 
-    function test_buy_moves_price() public {
-        uint256 priceBefore = market.yesPrice();
-
-        vm.prank(alice);
-        market.buy(true, 10e6, 0); // buy YES → YES price rises
-
-        uint256 priceAfter = market.yesPrice();
-        assertGt(priceAfter, priceBefore);
-    }
+function test_buy_moves_price() public {
+    uint256 priceBefore = market.yesPrice();
+    vm.prank(alice);
+    market.buy(true, 10e6, 0);
+    assertGt(market.yesPrice(), priceBefore); 
+}
 
     function test_buy_emits_event() public {
         vm.prank(alice);
@@ -389,7 +386,7 @@ contract MarketTest is Test {
     function test_redeem_yes_winner() public {
         // Alice buys YES
         vm.prank(alice);
-        uint256 shares = market.buy(true, 20e6, 0);
+        market.buy(true, 20e6, 0);
 
         _closeAndRequest();
         vm.prank(oracle);
@@ -669,19 +666,35 @@ contract MarketTest is Test {
         assertGt(market.collateral(), 0);
     }
 
+    function test_skim_recovers_surplus() public {
+        // Simulate untracked USDC arriving (e.g. Arc selfdestruct endowment)
+        usdc.mint(address(market), 7e6);
+
+        uint256 treasuryBefore = usdc.balanceOf(treasury);
+        uint256 surplus = market.skim();
+
+        assertEq(surplus, 7e6);
+        assertEq(usdc.balanceOf(treasury), treasuryBefore + 7e6);
+    }
+
+    function test_skim_reverts_no_surplus() public {
+        vm.expectRevert(Market.NothingToWithdraw.selector);
+        market.skim();
+    }
+
        
     // Invariant Helpers (called by Foundry invariant engine)
     
 
     /// @notice k = reserveYes × reserveNo should be ≥ initial k
-    function invariant_k_non_decreasing() public {
+    function invariant_k_non_decreasing() public  view  {
         uint256 k = market.getK();
-        uint256 initialK = (SEED / 2) * (SEED / 2);
+        uint256 initialK = (SEED * SEED) / 4;
         assertGe(k, initialK);
     }
 
     /// @notice Contract USDC balance must always ≥ collateral + accruedFees
-    function invariant_solvency() public {
+    function invariant_solvency() public view {
         uint256 balance = usdc.balanceOf(address(market));
         assertGe(balance, market.collateral() + market.accruedFees());
     }

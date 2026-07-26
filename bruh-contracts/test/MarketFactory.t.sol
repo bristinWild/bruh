@@ -227,6 +227,20 @@ contract MarketFactoryTest is Test {
         factory.setDefaultOracle(makeAddr("x"));
     }
 
+
+    function test_skim_recovers_stray_usdc() public {
+        usdc.mint(address(factory), 3e6);
+        uint256 before = usdc.balanceOf(treasury);
+        uint256 surplus = factory.skim();
+        assertEq(surplus, 3e6);
+        assertEq(usdc.balanceOf(treasury), before + 3e6);
+    }
+
+    function test_skim_reverts_empty() public {
+        vm.expectRevert(MarketFactory.NothingToSkim.selector);
+        factory.skim();
+    }
+
      
     // Views
      

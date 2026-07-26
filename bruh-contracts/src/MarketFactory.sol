@@ -91,6 +91,7 @@ contract MarketFactory is Ownable2Step, ReentrancyGuard, Pausable {
     event MarketPausedByFactory(address indexed market);
     event MarketUnpausedByFactory(address indexed market);
     event OracleRotated(address indexed market, address indexed newOracle);
+    event Skimmed(address indexed treasury, uint256 amount);
 
     // Errors
 
@@ -103,7 +104,7 @@ contract MarketFactory is Ownable2Step, ReentrancyGuard, Pausable {
     error NotWhitelisted();
     error NotAMarket();
     error InvalidFee();
-
+    error NothingToSkim();
     
     // Constructor
 
@@ -153,13 +154,15 @@ contract MarketFactory is Ownable2Step, ReentrancyGuard, Pausable {
 
         //  Input validation 
         if (bytes(question).length == 0) revert InvalidQuestion();
-
+        if (closeTime <= block.timestamp) revert DurationTooShort();
         uint256 duration = closeTime - block.timestamp;
         if (duration < MIN_DURATION) revert DurationTooShort();
         if (duration > MAX_DURATION) revert DurationTooLong();
 
         if (seedUsdc < MIN_SEED) revert SeedBelowMinimum();
         if (seedUsdc > MAX_SEED) revert SeedAboveMaximum();
+
+       
 
         address resolverOracle = oracle == address(0) ? defaultOracle : oracle;
         if (resolverOracle == address(0)) revert InvalidAddress();
@@ -276,6 +279,17 @@ contract MarketFactory is Ownable2Step, ReentrancyGuard, Pausable {
         _unpause();
     }
 
+    /// @notice Sweep any USDC held by the factory to the treasury.
+    /// @dev    ARC-SPECIFIC: the factory should hold zero USDC between
+    ///         transactions, but on Arc, SELFDESTRUCT endowments or direct
+    ///         native sends can credit this contract. Recover them here.
+    function skim() external nonReentrant returns (uint256 surplus) {
+        surplus = usdc.balanceOf(address(this));
+        if (surplus == 0) revert NothingToSkim();
+        usdc.safeTransfer(treasury, surplus);
+        emit Skimmed(treasury, surplus);
+    }
+
     // Views
 
     /// @notice Total number of markets deployed.
@@ -303,6 +317,8 @@ contract MarketFactory is Ownable2Step, ReentrancyGuard, Pausable {
             result[i] = markets[offset + i];
         }
     }
+
+
 
     /// @notice Markets created by a given address.
     function getMarketsByCreator(address creator)

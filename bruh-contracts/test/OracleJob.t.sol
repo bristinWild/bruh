@@ -321,49 +321,52 @@ contract OracleJobTest is Test {
         jobContract.submitOutcome(jobId, Market.Outcome.YES, "ipfs://evidence");
     }
 
+
     function test_submit_deadline_slashes_bond() public {
-        uint256 jobId = _createAndAccept();
-        vm.warp(block.timestamp + jobContract.SUBMIT_DEADLINE() + 1);
+            uint256 jobId = _createAndAccept();
+            vm.warp(block.timestamp + jobContract.SUBMIT_DEADLINE() + 1);
 
-        uint256 treasuryBefore   = usdc.balanceOf(treasury);
-        uint256 requesterBefore  = usdc.balanceOf(requester);
+            // submitOutcome now just reverts cleanly
+            vm.prank(oracle);
+            vm.expectRevert(OracleJob.SubmitDeadlinePassed.selector);
+            jobContract.submitOutcome(jobId, Market.Outcome.YES, "");
 
-        vm.prank(oracle);
-        vm.expectRevert(OracleJob.SubmitDeadlinePassed.selector);
-        jobContract.submitOutcome(jobId, Market.Outcome.YES, "");
+            // Anyone calls slash separately
+            jobContract.slashExpiredSubmission(jobId);
 
-        // Bond slashed to treasury, fee refunded to requester
-        assertEq(usdc.balanceOf(treasury),  treasuryBefore  + BOND);
-        assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
-    }
+            // Treasury claims bond
+            uint256 treasuryBefore = usdc.balanceOf(treasury);
+            vm.prank(treasury);
+            jobContract.claimPayout();
+            assertEq(usdc.balanceOf(treasury), treasuryBefore + BOND);
+
+            // Requester claims fee
+            uint256 requesterBefore = usdc.balanceOf(requester);
+            vm.prank(requester);
+            jobContract.claimPayout();
+            assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
+        }
 
      
     // finalise
      
 
-    function test_finalise_after_window() public {
-        uint256 jobId = _createAcceptAndSubmit();
+   function test_finalise_after_window() public {
+    uint256 jobId = _createAcceptAndSubmit();
+    vm.warp(block.timestamp + jobContract.DISPUTE_WINDOW() + 1);
 
-        // Warp past dispute window
-        vm.warp(block.timestamp + jobContract.DISPUTE_WINDOW() + 1);
+    jobContract.finalise(jobId);
 
-        uint256 oracleBefore = usdc.balanceOf(oracle);
-        jobContract.finalise(jobId);
+    // ARC pull pattern: oracle claims separately
+    uint256 oracleBefore = usdc.balanceOf(oracle);
+    vm.prank(oracle);
+    jobContract.claimPayout();
 
-        // Oracle receives fee + bond
-        assertEq(usdc.balanceOf(oracle), oracleBefore + FEE + BOND);
-
-        OracleJob.Job memory job = jobContract.getJob(jobId);
-        assertEq(uint8(job.status), uint8(OracleJob.JobStatus.FINALISED));
-        assertEq(job.fee,  0);
-        assertEq(job.bond, 0);
-
-        // Market should be resolved
-        assertTrue(market.resolved());
-        assertEq(uint8(market.outcome()), uint8(Market.Outcome.YES));
-
-        assertFalse(jobContract.hasActiveJob(address(market)));
-    }
+    assertEq(usdc.balanceOf(oracle), oracleBefore + FEE + BOND);
+    assertEq(uint8(jobContract.getJob(jobId).status), uint8(OracleJob.JobStatus.FINALISED));
+    assertTrue(market.resolved());
+    assertFalse(jobContract.hasActiveJob(address(market)));
+}
 
     function test_finalise_emits_event() public {
         uint256 jobId = _createAcceptAndSubmit();
@@ -425,15 +428,14 @@ contract OracleJobTest is Test {
         jobContract.dispute(jobId);
     }
 
-    function test_dispute_reverts_already_disputed() public {
-        uint256 jobId = _createAcceptAndSubmit();
-        vm.prank(disputer);
-        jobContract.dispute(jobId);
-        vm.prank(rogue);
-        vm.expectRevert(OracleJob.AlreadyDisputed.selector);
-        jobContract.dispute(jobId);
-    }
-
+ function test_dispute_reverts_already_disputed() public {
+    uint256 jobId = _createAcceptAndSubmit();
+    vm.prank(disputer);
+    jobContract.dispute(jobId);
+    vm.prank(rogue);
+    vm.expectRevert(OracleJob.AlreadyDisputed.selector); 
+    jobContract.dispute(jobId);
+}
     function test_dispute_reverts_not_submitted() public {
         uint256 jobId = _createAndAccept();
         vm.expectRevert(OracleJob.JobNotSubmitted.selector);
@@ -453,22 +455,21 @@ contract OracleJobTest is Test {
     // uphold
      
 
-    function test_uphold() public {
-        uint256 jobId = _createAcceptSubmitAndDispute();
+   function test_uphold() public {
+    uint256 jobId = _createAcceptSubmitAndDispute();
 
-        uint256 oracleBefore = usdc.balanceOf(oracle);
-        vm.prank(owner);
-        jobContract.uphold(jobId);
+    vm.prank(owner);
+    jobContract.uphold(jobId);
 
-        // Oracle gets fee + bond
-        assertEq(usdc.balanceOf(oracle), oracleBefore + FEE + BOND);
+    uint256 oracleBefore = usdc.balanceOf(oracle);
+    vm.prank(oracle);
+    jobContract.claimPayout();
 
-        OracleJob.Job memory job = jobContract.getJob(jobId);
-        assertEq(uint8(job.status), uint8(OracleJob.JobStatus.FINALISED));
-
-        assertTrue(market.resolved());
-        assertFalse(jobContract.hasActiveJob(address(market)));
-    }
+    assertEq(usdc.balanceOf(oracle), oracleBefore + FEE + BOND);
+    assertEq(uint8(jobContract.getJob(jobId).status), uint8(OracleJob.JobStatus.FINALISED));
+    assertTrue(market.resolved());
+    assertFalse(jobContract.hasActiveJob(address(market)));
+}
 
     function test_uphold_emits_events() public {
         uint256 jobId = _createAcceptSubmitAndDispute();
@@ -496,32 +497,28 @@ contract OracleJobTest is Test {
     // overturn
      
 
-    function test_overturn() public {
-        uint256 jobId = _createAcceptSubmitAndDispute();
+  function test_overturn() public {
+    uint256 jobId = _createAcceptSubmitAndDispute();
 
-        uint256 treasuryBefore  = usdc.balanceOf(treasury);
-        uint256 requesterBefore = usdc.balanceOf(requester);
+    vm.prank(owner);
+    jobContract.overturn(jobId, Market.Outcome.NO);
 
-        vm.prank(owner);
-        jobContract.overturn(jobId, Market.Outcome.NO);
+    // Treasury claims slashed bond
+    uint256 treasuryBefore = usdc.balanceOf(treasury);
+    vm.prank(treasury);
+    jobContract.claimPayout();
+    assertEq(usdc.balanceOf(treasury), treasuryBefore + BOND);
 
-        // Bond slashed to treasury
-        assertEq(usdc.balanceOf(treasury),  treasuryBefore  + BOND);
-        // Fee refunded to requester
-        assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
+    // Requester claims refunded fee
+    uint256 requesterBefore = usdc.balanceOf(requester);
+    vm.prank(requester);
+    jobContract.claimPayout();
+    assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
 
-        OracleJob.Job memory job = jobContract.getJob(jobId);
-        assertEq(uint8(job.status),  uint8(OracleJob.JobStatus.OVERTURNED));
-        assertEq(uint8(job.outcome), uint8(Market.Outcome.NO));
-        assertEq(job.bond, 0);
-        assertEq(job.fee,  0);
-
-        // Market resolved with corrected outcome
-        assertTrue(market.resolved());
-        assertEq(uint8(market.outcome()), uint8(Market.Outcome.NO));
-
-        assertFalse(jobContract.hasActiveJob(address(market)));
-    }
+    assertEq(uint8(jobContract.getJob(jobId).status), uint8(OracleJob.JobStatus.OVERTURNED));
+    assertEq(uint8(market.outcome()), uint8(Market.Outcome.NO));
+    assertFalse(jobContract.hasActiveJob(address(market)));
+}
 
     function test_overturn_emits_event() public {
         uint256 jobId = _createAcceptSubmitAndDispute();
@@ -556,19 +553,20 @@ contract OracleJobTest is Test {
     // expiry
      
 
-    function test_expire_job_refunds_fee() public {
-        uint256 jobId = _createJob();
-        vm.warp(block.timestamp + jobContract.ACCEPT_DEADLINE() + 1);
+   function test_expire_job_refunds_fee() public {
+    uint256 jobId = _createJob();
+    vm.warp(block.timestamp + jobContract.ACCEPT_DEADLINE() + 1);
 
-        uint256 requesterBefore = usdc.balanceOf(requester);
-        jobContract.expireJob(jobId);
+    jobContract.expireJob(jobId);
 
-        assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
+    uint256 requesterBefore = usdc.balanceOf(requester);
+    vm.prank(requester);
+    jobContract.claimPayout();
 
-        OracleJob.Job memory job = jobContract.getJob(jobId);
-        assertEq(uint8(job.status), uint8(OracleJob.JobStatus.EXPIRED));
-        assertFalse(jobContract.hasActiveJob(address(market)));
-    }
+    assertEq(usdc.balanceOf(requester), requesterBefore + FEE);
+    assertEq(uint8(jobContract.getJob(jobId).status), uint8(OracleJob.JobStatus.EXPIRED));
+    assertFalse(jobContract.hasActiveJob(address(market)));
+}
 
     function test_expire_job_emits_event() public {
         uint256 jobId = _createJob();
