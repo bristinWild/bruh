@@ -5,57 +5,73 @@ import { MarketState } from "./market.js";
 const client = new Anthropic({ apiKey: CONFIG.ANTHROPIC_API_KEY });
 
 export interface Reasoning {
-    probability: number;     // 0–1 estimated P(YES)
-    confidence: number;      // 0–1 confidence in estimate
-    keyFactors: string[];    // top 3 reasons
-    summary: string;         // one-line reasoning
+    probability: number;
+    confidence: number;
+    keyFactors: string[];
+    summary: string;
 }
+
+const AGENT_PERSONAS: Record<string, { system: string; temperature: number }> = {
+    Newshound: {
+        system: `You are an aggressive momentum trader. You weight recent news, price action, and narrative shifts heavily. You move fast and are willing to take strong positions when you see clear signals. You distrust markets that are slow to price in new information. Be decisive — don't hedge everything.`,
+        temperature: 0.9,
+    },
+    Actuary: {
+        system: `You are a conservative base-rate analyst. You anchor firmly on historical frequencies and revert aggressively to priors. You are deeply skeptical of recency bias and narrative-driven moves. You believe markets frequently overreact to headlines. Your estimates barely move unless the fundamentals change.`,
+        temperature: 0.3,
+    },
+};
 
 export async function reason(
     market: MarketState,
     agentName: string,
     strategy: string
 ): Promise<Reasoning> {
-    const prompt = `You are ${agentName}, an autonomous AI forecasting agent using a ${strategy} strategy.
+    const persona = AGENT_PERSONAS[agentName] ?? {
+        system: `You are a forecasting agent using a ${strategy} strategy.`,
+        temperature: 0.7,
+    };
 
-Market question: "${market.question}"
-Current market price: YES=${(market.yesPrice * 100).toFixed(1)}%, NO=${(market.noPrice * 100).toFixed(1)}%
+    const prompt = `Market question: "${market.question}"
+Current market consensus: YES=${(market.yesPrice * 100).toFixed(1)}%, NO=${(market.noPrice * 100).toFixed(1)}%
 
-Your task: Estimate the true probability of YES and determine if the market is mispriced.
+Estimate the TRUE probability of YES. Consider whether the market is mispriced.
 
-Respond ONLY with valid JSON in this exact format:
+Respond ONLY with valid JSON:
 {
   "probability": 0.65,
   "confidence": 0.7,
-  "keyFactors": ["factor 1", "factor 2", "factor 3"],
-  "summary": "one line reasoning"
-}
-
-Rules:
-- probability must be between 0.0 and 1.0
-- confidence must be between 0.0 and 1.0
-- keyFactors must have exactly 3 items
-- summary must be under 100 characters`;
+  "keyFactors": ["specific factor 1", "specific factor 2", "specific factor 3"],
+  "summary": "one line under 100 chars"
+}`;
 
     const response = await client.messages.create({
         model: "claude-sonnet-4-6",
         max_tokens: 300,
+        system: persona.system,
         messages: [{ role: "user", content: prompt }],
+        // @ts-ignore — temperature supported at runtime
+        temperature: persona.temperature,
     });
 
-    const text = response.content[0].type === "text" ? response.content[0].text : "";
+    const text =
+        response.content[0].type === "text" ? response.content[0].text : "";
 
     try {
         const clean = text.replace(/```json|```/g, "").trim();
         const parsed = JSON.parse(clean) as Reasoning;
+
+        // Clamp values to valid range
+        parsed.probability = Math.max(0.01, Math.min(0.99, parsed.probability));
+        parsed.confidence = Math.max(0.01, Math.min(0.99, parsed.confidence));
+
         return parsed;
     } catch {
-        // Fallback to market price if parsing fails
         return {
             probability: market.yesPrice,
             confidence: 0.1,
-            keyFactors: ["failed to parse", "using market price", "low confidence"],
-            summary: "reasoning failed — using market price as prior",
+            keyFactors: ["parse failed", "using market prior", "low confidence"],
+            summary: "reasoning failed — defaulting to market price",
         };
     }
 }
