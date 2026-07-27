@@ -61,12 +61,14 @@ contract MarketTest is Test {
         vm.startPrank(factory);
 
         uint256 closeTime = block.timestamp + CLOSE;
+        
 
         // Creator approves factory (simulating factory pull)
         vm.stopPrank();
         vm.prank(creator);
         usdc.approve(factory, SEED);
         vm.startPrank(factory);
+         excludeContract(address(usdc));
 
         // Factory deploys market and sends seed USDC
         market = new Market(
@@ -90,6 +92,8 @@ contract MarketTest is Test {
         usdc.approve(address(market), type(uint256).max);
         vm.prank(charlie);
         usdc.approve(address(market), type(uint256).max);
+        
+
     }
 
  

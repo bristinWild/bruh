@@ -9,4 +9,4 @@ via_ir = true
 remappings = ["@openzeppelin/=lib/openzeppelin-contracts/"]
 
 [rpc_endpoints]
-arc_testnet = "https://rpc.testnet.arc.network"
+arc_testnet = "https://rpc.testnet.arc.io"
