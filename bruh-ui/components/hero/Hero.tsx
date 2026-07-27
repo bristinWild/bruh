@@ -68,7 +68,7 @@ export default function Hero() {
                                 e.currentTarget.style.background = "transparent";
                             }}
                         >
-                            How it works
+                            Get Started
                         </a>
                     </motion.div>
 
