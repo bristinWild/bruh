@@ -9,6 +9,8 @@ import { CircleService } from 'src/circle.service';
 import { AuthService } from 'src/auth/auth.service';
 import { JwtStrategy } from 'src/auth/jwt.strategy';
 import { WalletsService } from 'src/wallets/wallets.service';
+import { AgentsController } from 'src/agents/agents.controller';
+import { AgentsService } from 'src/agents/agents.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
@@ -25,13 +27,14 @@ import { TradesModule } from './trades/trades.module';
       signOptions: { expiresIn: '7d' },
     }),
   ],
-  controllers: [AuthController, WalletsController],
+  controllers: [AuthController, WalletsController, AgentsController],
   providers: [
     SupabaseService,
     CircleService,
     AuthService,
     JwtStrategy,
     WalletsService,
+    AgentsService
   ],
 })
 export class AppModule { }
