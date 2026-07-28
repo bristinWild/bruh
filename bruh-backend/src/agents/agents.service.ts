@@ -58,7 +58,7 @@ export class AgentsService {
         console.log('API KEY FIRST 20:', process.env.ANTHROPIC_API_KEY?.slice(0, 20));
         this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         this.publicClient = createPublicClient({
-            transport: http(process.env.ARC_RPC_URL || 'https://rpc.drpc.testnet.arc.io'),
+            transport: http(process.env.ARC_RPC_URL || 'https://rpc.testnet.arc.io'),
         });
     }
 

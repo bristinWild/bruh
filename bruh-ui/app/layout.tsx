@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Inter, JetBrains_Mono } from "next/font/google";
+import { Web3Provider } from "@/src/providers/Web3Provider";
 import "./globals.css";
 
 const geist = Geist({
@@ -28,8 +29,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className={`${geist.variable} ${inter.variable} ${jetbrains.variable} antialiased`}>
-        {children}
+      <body className={`...`}>
+        <Web3Provider>
+          {children}
+        </Web3Provider>
       </body>
     </html>
   );

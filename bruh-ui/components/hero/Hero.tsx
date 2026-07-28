@@ -56,7 +56,7 @@ export default function Hero() {
                             View live markets
                         </a>
                         <a
-                            href="#how"
+                            href="/get-started"
                             className="rounded-full border px-6 py-3 text-sm font-semibold transition-all hover:scale-[1.02] active:scale-[0.98]"
                             style={{ borderColor: "#6EE7FF", borderWidth: "1.5px", color: "#0EA5E9", background: "transparent" }}
                             onMouseEnter={e => {
