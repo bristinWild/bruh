@@ -44,11 +44,18 @@ export class AgentsService {
     private client: Anthropic;
     private publicClient: any;
     private running = false;
+    private getClient(): Anthropic {
+        return new Anthropic({
+            apiKey: process.env.ANTHROPIC_API_KEY
+        });
+    }
 
     constructor(
         private supabase: SupabaseService,
         private circle: CircleService,
+
     ) {
+        console.log('API KEY FIRST 20:', process.env.ANTHROPIC_API_KEY?.slice(0, 20));
         this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
         this.publicClient = createPublicClient({
             transport: http(process.env.ARC_RPC_URL || 'https://rpc.drpc.testnet.arc.io'),
@@ -103,7 +110,7 @@ export class AgentsService {
 
         // Reason with Claude
         const persona = PERSONAS[strategy] || PERSONAS.newshound;
-        const response = await this.client.messages.create({
+        const response = await this.getClient().messages.create({
             model: 'claude-sonnet-4-6',
             max_tokens: 300,
             system: persona.system,
