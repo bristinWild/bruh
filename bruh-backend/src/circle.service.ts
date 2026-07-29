@@ -32,14 +32,39 @@ export class CircleService {
         return res.data?.tokenBalances;
     }
 
-    async executeContractCall(walletId: string, contractAddress: string, abiFunctionSignature: string, params: any[]) {
+    async executeContractCall(
+        walletId: string,
+        contractAddress: string,
+        abiFunctionSignature: string,
+        abiParameters: any[],
+    ) {
         const res = await this.client.createContractExecutionTransaction({
             walletId,
             contractAddress,
             abiFunctionSignature,
-            abiParameters: params,
+            abiParameters,
             fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
         });
         return res.data;
+    }
+
+    async getTransactionStatus(transactionId: string) {
+        const res = await this.client.getTransaction({ id: transactionId });
+        return res.data?.transaction;
+    }
+
+    async waitForTransaction(transactionId: string, maxAttempts = 20): Promise<string | null> {
+        for (let i = 0; i < maxAttempts; i++) {
+            const tx = await this.getTransactionStatus(transactionId);
+            if (tx?.state === 'COMPLETE' || tx?.state === 'CONFIRMED') {
+                return tx.txHash || null;
+            }
+            if (tx?.state === 'FAILED') {
+                console.error('Transaction failed:', tx);
+                return null;
+            }
+            await new Promise(r => setTimeout(r, 3000));
+        }
+        return null;
     }
 }

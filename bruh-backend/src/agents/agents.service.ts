@@ -132,25 +132,42 @@ export class AgentsService {
             return;
         }
 
-        // Execute trade via Circle
         const usdcAmount = Math.floor(wallet.max_position_usdc * edge * wallet.kelly_fraction);
-
         console.log(`[${strategy}] ${isYes ? 'BUY_YES' : 'BUY_NO'} ${usdcAmount / 1e6} USDC on "${question}"`);
 
-        const txResult = await this.circle.executeContractCall(
-            wallet.circle_wallet_id,
-            marketAddress,
-            'buy(bool,uint256,uint256)',
-            [isYes, usdcAmount.toString(), '0']
-        );
+        let txHash: string | undefined = undefined;
 
-        // Store trade in Supabase
+        try {
+            // Step 1: approve USDC spend by the market contract
+            const approveTx = await this.circle.executeContractCall(
+                wallet.circle_wallet_id,
+                '0x3600000000000000000000000000000000000000', // USDC
+                'approve(address,uint256)',
+                [marketAddress, usdcAmount.toString()],
+            );
+            console.log(`[${strategy}] Approve submitted: ${approveTx.id}`);
+            await this.circle.waitForTransaction(approveTx.id);
+
+            // Step 2: execute buy
+            const buyTx = await this.circle.executeContractCall(
+                wallet.circle_wallet_id,
+                marketAddress,
+                'buy(bool,uint256,uint256)',
+                [isYes, usdcAmount.toString(), '0'],
+            );
+            console.log(`[${strategy}] Buy submitted: ${buyTx.id}`);
+            txHash = await this.circle.waitForTransaction(buyTx.id) || undefined;
+            console.log(`[${strategy}] Confirmed txHash: ${txHash}`);
+        } catch (err) {
+            console.error(`[${strategy}] Trade execution failed:`, err);
+        }
+
         await this.logTrade(
             wallet.id,
             marketAddress,
             isYes ? 'BUY_YES' : 'BUY_NO',
             BigInt(usdcAmount),
-            txResult.id, // tx hash added after Circle tx
+            txHash,
             reasoning.summary,
             edge
         );
