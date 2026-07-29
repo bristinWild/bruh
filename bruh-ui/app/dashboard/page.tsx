@@ -339,23 +339,13 @@ export default function Dashboard() {
                                                         color: running ? "#16A34A" : "var(--color-muted)",
                                                     }}
                                                 >
-                                                    {running ? (
-                                                        <button
-                                                            onClick={handleStop}
-                                                            className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
-                                                            style={{ background: "#DC2626" }}
-                                                        >
-                                                            ⏸ Stop agent
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={handleRun}
-                                                            className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
-                                                            style={{ background: "#38BDF8" }}
-                                                        >
-                                                            Run agent →
-                                                        </button>
+                                                    {running && (
+                                                        <span className="relative flex h-1.5 w-1.5">
+                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yes opacity-60" />
+                                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yes" />
+                                                        </span>
                                                     )}
+                                                    {running ? "running" : selected.status}
                                                 </span>
                                             </div>
 
@@ -384,7 +374,23 @@ export default function Dashboard() {
                                                 className="w-full rounded-full py-3 text-sm font-semibold text-white disabled:opacity-50 transition-all"
                                                 style={{ background: running ? "var(--color-line)" : "#38BDF8", color: running ? "var(--color-muted)" : "white" }}
                                             >
-                                                {running ? "Agent running..." : "Run agent →"}
+                                                {running ? (
+                                                    <button
+                                                        onClick={handleStop}
+                                                        className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                        style={{ background: "#DC2626" }}
+                                                    >
+                                                        ⏸ Stop agent
+                                                    </button>
+                                                ) : (
+                                                    <button
+                                                        onClick={handleRun}
+                                                        className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                        style={{ background: "#38BDF8" }}
+                                                    >
+                                                        Run agent →
+                                                    </button>
+                                                )}
                                             </button>
                                         </div>
 
