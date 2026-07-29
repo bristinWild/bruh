@@ -443,7 +443,7 @@ export default function Dashboard() {
                                             </div>
                                         </div>
                                         <p className="text-sm text-muted text-center">
-                                            Realized P&L tracking requires market resolution — coming once markets close.
+                                            Realized P&L tracking requires market resolution - coming once markets close.
                                         </p>
                                     </motion.div>
                                 )}

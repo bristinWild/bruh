@@ -20,7 +20,7 @@ export class CircleService {
     async createWallet(walletSetId: string, userAddress: string) {
         const res = await this.client.createWallets({
             walletSetId,
-            blockchains: ['ARB-SEPOLIA'], // Arc testnet
+            blockchains: ['ARC-TESTNET'],
             count: 1,
             metadata: [{ name: `agent-${userAddress}` }],
         });
