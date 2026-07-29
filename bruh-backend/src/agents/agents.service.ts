@@ -137,13 +137,20 @@ export class AgentsService {
 
         console.log(`[${strategy}] ${isYes ? 'BUY_YES' : 'BUY_NO'} ${usdcAmount / 1e6} USDC on "${question}"`);
 
+        const txResult = await this.circle.executeContractCall(
+            wallet.circle_wallet_id,
+            marketAddress,
+            'buy(bool,uint256,uint256)',
+            [isYes, usdcAmount.toString(), '0']
+        );
+
         // Store trade in Supabase
         await this.logTrade(
             wallet.id,
             marketAddress,
             isYes ? 'BUY_YES' : 'BUY_NO',
             BigInt(usdcAmount),
-            undefined, // tx hash added after Circle tx
+            txResult.id, // tx hash added after Circle tx
             reasoning.summary,
             edge
         );

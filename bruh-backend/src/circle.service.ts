@@ -31,4 +31,15 @@ export class CircleService {
         const res = await this.client.getWalletTokenBalance({ id: walletId });
         return res.data?.tokenBalances;
     }
+
+    async executeContractCall(walletId: string, contractAddress: string, abiFunctionSignature: string, params: any[]) {
+        const res = await this.client.createContractExecutionTransaction({
+            walletId,
+            contractAddress,
+            abiFunctionSignature,
+            abiParameters: params,
+            fee: { type: 'level', config: { feeLevel: 'MEDIUM' } },
+        });
+        return res.data;
+    }
 }

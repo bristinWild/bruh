@@ -1,6 +1,6 @@
 "use client";
 
-import { RainbowKitProvider, getDefaultConfig, getDefaultWallets } from "@rainbow-me/rainbowkit";
+import { RainbowKitProvider, getDefaultConfig, lightTheme } from "@rainbow-me/rainbowkit";
 import { metaMaskWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -21,7 +21,7 @@ const arcTestnet = {
 
 const config = getDefaultConfig({
     appName: "Bruh",
-    projectId: "bruh-prediction-market",
+    projectId: "fc4faa437744b2d6061f2f92db239b22",
     chains: [arcTestnet],
     ssr: true,
     wallets: [
@@ -35,10 +35,27 @@ const config = getDefaultConfig({
 const queryClient = new QueryClient();
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
+
+    const customTheme = lightTheme({
+        accentColor: "#38BDF8",
+        accentColorForeground: "white",
+        borderRadius: "large",
+        fontStack: "system",
+        overlayBlur: "small",
+    });
+
+    customTheme.colors.modalBackground = "#ffffff";
+    customTheme.colors.modalBorder = "#d7d9dc";
+    customTheme.colors.profileForeground = "#f7f8fa";
+    customTheme.colors.closeButton = "#6b6e73";
+    customTheme.colors.connectButtonBackground = "#38BDF8";
+    customTheme.radii.modal = "20px";
+    customTheme.radii.menuButton = "16px";
+    customTheme.fonts.body = "var(--font-sans)";
     return (
         <WagmiProvider config={config}>
             <QueryClientProvider client={queryClient}>
-                <RainbowKitProvider>
+                <RainbowKitProvider theme={customTheme}>
                     {children}
                 </RainbowKitProvider>
             </QueryClientProvider>
