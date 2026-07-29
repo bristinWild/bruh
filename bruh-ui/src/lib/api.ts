@@ -20,17 +20,11 @@ export async function verifySignature(
     return data.token;
 }
 
-export async function createAgentWallet(
-    token: string,
-    strategy: string
-): Promise<any> {
+export async function createAgentWallet(token: string, strategy: string, agentName: string): Promise<any> {
     const res = await fetch(`${API_URL}/wallets`, {
         method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ strategy }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ strategy, agentName }),
     });
     return res.json();
 }

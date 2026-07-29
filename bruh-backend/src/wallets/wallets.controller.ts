@@ -8,8 +8,8 @@ export class WalletsController {
     constructor(private wallets: WalletsService) { }
 
     @Post()
-    create(@Request() req: any, @Body() body: { strategy: string }) {
-        return this.wallets.createAgentWallet(req.user.address, body.strategy);
+    create(@Request() req: any, @Body() body: { strategy: string; agentName: string }) {
+        return this.wallets.createAgentWallet(req.user.address, body.strategy, body.agentName);
     }
 
     @Get()

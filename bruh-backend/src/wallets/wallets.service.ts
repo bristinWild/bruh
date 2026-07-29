@@ -9,10 +9,19 @@ export class WalletsService {
         private supabase: SupabaseService,
     ) { }
 
-    async createAgentWallet(userAddress: string, strategy: string) {
 
+    private generateAgentId(): string {
+        const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
+        let code = '';
+        for (let i = 0; i < 5; i++) {
+            code += chars[Math.floor(Math.random() * chars.length)];
+        }
+        return `AGT-${code}`;
+    }
+
+
+    async createAgentWallet(userAddress: string, strategy: string, agentName: string) {
         const walletSet = await this.circle.createWalletSet(`bruh-${userAddress}`);
-
         const wallet = await this.circle.createWallet(walletSet!.id!, userAddress);
 
         const { data } = await this.supabase.db
@@ -22,6 +31,8 @@ export class WalletsService {
                 circle_wallet_id: wallet!.id,
                 circle_wallet_address: wallet!.address,
                 strategy,
+                agent_name: agentName,
+                agent_id: this.generateAgentId(),
                 status: 'paused',
             })
             .select()
