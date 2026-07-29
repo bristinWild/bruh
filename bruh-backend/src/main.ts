@@ -8,8 +8,8 @@ async function bootstrap() {
   app.enableCors({
     origin: [
       'http://localhost:3000',
-      'http://localhost:3001',
-      process.env.FRONTEND_URL || 'https://bruhmarket.com',
+      'https://bruhmarket.com',
+      'https://www.bruhmarket.com',
     ],
     credentials: true,
   });
