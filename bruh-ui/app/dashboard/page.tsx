@@ -38,6 +38,8 @@ export default function Dashboard() {
     const [activeTab, setActiveTab] = useState<"agent" | "pnl" | "transactions">("agent");
 
 
+
+
     useEffect(() => {
         const t = localStorage.getItem("bruh_token");
         if (t) setToken(t);
@@ -84,12 +86,27 @@ export default function Dashboard() {
     async function handleRun() {
         if (!token || !selected) return;
         setRunning(true);
+        // Set status active in DB
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/wallets/${selected.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status: "active" }),
+        });
         await runAgent(token, selected.id);
-        // Poll once immediately after a short delay
         setTimeout(async () => {
             const tr = await getTrades(token, selected.id);
             setTrades(tr || []);
         }, 3000);
+    }
+
+    async function handleStop() {
+        if (!token || !selected) return;
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/wallets/${selected.id}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ status: "paused" }),
+        });
+        setRunning(false);
     }
 
     async function selectWallet(w: any) {
@@ -322,13 +339,23 @@ export default function Dashboard() {
                                                         color: running ? "#16A34A" : "var(--color-muted)",
                                                     }}
                                                 >
-                                                    {running && (
-                                                        <span className="relative flex h-1.5 w-1.5">
-                                                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yes opacity-60" />
-                                                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yes" />
-                                                        </span>
+                                                    {running ? (
+                                                        <button
+                                                            onClick={handleStop}
+                                                            className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                            style={{ background: "#DC2626" }}
+                                                        >
+                                                            ⏸ Stop agent
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={handleRun}
+                                                            className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                            style={{ background: "#38BDF8" }}
+                                                        >
+                                                            Run agent →
+                                                        </button>
                                                     )}
-                                                    {running ? "running" : selected.status}
                                                 </span>
                                             </div>
 

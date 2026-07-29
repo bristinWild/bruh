@@ -85,6 +85,18 @@ export class AgentsService {
 
         for (const strategy of strategies) {
             for (const marketAddress of MARKETS) {
+                // Check if agent was paused mid-cycle
+                const { data: current } = await this.supabase.db
+                    .from('agent_wallets')
+                    .select('status')
+                    .eq('id', wallet.id)
+                    .single();
+
+                if (current?.status === 'paused') {
+                    console.log(`[${wallet.id}] Agent paused, stopping cycle`);
+                    return;
+                }
+
                 try {
                     await this.processMarket(wallet, strategy, marketAddress);
                 } catch (err) {

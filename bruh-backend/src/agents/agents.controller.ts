@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Param, UseGuards } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 
@@ -18,4 +18,6 @@ export class AgentsController {
     trades(@Param('walletId') walletId: string) {
         return this.agents.getTradeHistory(walletId);
     }
+
+
 }
