@@ -368,30 +368,23 @@ export default function Dashboard() {
                                                 </div>
                                             </div>
 
-                                            <button
-                                                onClick={handleRun}
-                                                disabled={running}
-                                                className="w-full rounded-full py-3 text-sm font-semibold text-white disabled:opacity-50 transition-all"
-                                                style={{ background: running ? "var(--color-line)" : "#38BDF8", color: running ? "var(--color-muted)" : "white" }}
-                                            >
-                                                {running ? (
-                                                    <button
-                                                        onClick={handleStop}
-                                                        className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
-                                                        style={{ background: "#DC2626" }}
-                                                    >
-                                                        ⏸ Stop agent
-                                                    </button>
-                                                ) : (
-                                                    <button
-                                                        onClick={handleRun}
-                                                        className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
-                                                        style={{ background: "#38BDF8" }}
-                                                    >
-                                                        Run agent →
-                                                    </button>
-                                                )}
-                                            </button>
+                                            {running ? (
+                                                <button
+                                                    onClick={handleStop}
+                                                    className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                    style={{ background: "#DC2626" }}
+                                                >
+                                                    ⏸ Stop agent
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={handleRun}
+                                                    className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                    style={{ background: "#38BDF8" }}
+                                                >
+                                                    Run agent →
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* reasoning feed */}
