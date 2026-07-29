@@ -36,6 +36,7 @@ export default function Dashboard() {
     const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
     const [running, setRunning] = useState(false);
     const [activeTab, setActiveTab] = useState<"agent" | "pnl" | "transactions">("agent");
+    const [agentState, setAgentState] = useState<"idle" | "running" | "done">("idle");
 
 
 
@@ -85,18 +86,26 @@ export default function Dashboard() {
 
     async function handleRun() {
         if (!token || !selected) return;
-        setRunning(true);
-        // Set status active in DB
+        setAgentState("running");
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/wallets/${selected.id}/status`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ status: "active" }),
         });
         await runAgent(token, selected.id);
+
+        // Poll trades, then mark done after cycle completes
         setTimeout(async () => {
             const tr = await getTrades(token, selected.id);
             setTrades(tr || []);
-        }, 3000);
+            setAgentState("done");
+            // reset status to paused since cycle is complete
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL}/wallets/${selected.id}/status`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ status: "paused" }),
+            });
+        }, 8000); // adjust based on how long a full cycle actually takes
     }
 
     async function handleStop() {
@@ -106,7 +115,7 @@ export default function Dashboard() {
             headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ status: "paused" }),
         });
-        setRunning(false);
+        setAgentState("idle");
     }
 
     async function selectWallet(w: any) {
@@ -368,13 +377,21 @@ export default function Dashboard() {
                                                 </div>
                                             </div>
 
-                                            {running ? (
+                                            {agentState === "running" ? (
                                                 <button
                                                     onClick={handleStop}
                                                     className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
                                                     style={{ background: "#DC2626" }}
                                                 >
                                                     ⏸ Stop agent
+                                                </button>
+                                            ) : agentState === "done" ? (
+                                                <button
+                                                    onClick={handleRun}
+                                                    className="w-full rounded-full py-3 text-sm font-semibold text-white transition-all"
+                                                    style={{ background: "#1c1d1f" }}
+                                                >
+                                                    ✓ Done - Rerun →
                                                 </button>
                                             ) : (
                                                 <button
