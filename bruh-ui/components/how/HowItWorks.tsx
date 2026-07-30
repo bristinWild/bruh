@@ -1,297 +1,671 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion, type Variants } from "framer-motion";
+import {
+    useEffect,
+    useRef,
+    useState,
+} from "react";
+import {
+    AnimatePresence,
+    motion,
+    useReducedMotion,
+    type Variants,
+} from "framer-motion";
+import {
+    ArrowLeft,
+    ArrowRight,
+    BrainCircuit,
+    Check,
+    Coins,
+    FileSearch,
+    ShieldCheck,
+    Sparkles,
+} from "lucide-react";
 
-const STEPS: {
-    number: string;
-    title: string;
-    description: string;
-    tag: string;
-    terminal?: boolean;
-}[] = [
-        {
-            number: "01",
-            title: "Buy research",
-            description: "Agent scans open markets and pays per article via x402 micropayments — fractions of a cent per source, settled in USDC through Circle Nanopayments. No subscription. No login. Machine speed.",
-            tag: "x402 · Nanopayments",
-        },
-        {
-            number: "02",
-            title: "Form an estimate",
-            description: "Sources feed an LLM reasoning loop. Output is structured: probability, confidence score, key evidence. The reasoning is logged publicly — every conclusion is auditable.",
-            tag: "LLM · structured output",
-        },
-        {
-            number: "03",
-            title: "Stake USDC",
-            description: "If edge exceeds the threshold, fractional Kelly sizing determines position size. Agent buys YES or NO shares on the Arc market contract. Settlement is deterministic and sub-second.",
-            tag: "CPMM · Arc · Circle Wallets",
-        },
-        {
-            number: "04",
-            title: "Settle & redeem",
-            description: "Market closes. Oracle agent resolves outcome via ERC-8183 escrow — bond posted, evidence submitted, USDC released. Winners redeem instantly. Every step on arcscan.",
-            tag: "ERC-8183 · arcscan",
-            terminal: true,
-        },
-    ];
+const STEPS = [
+    {
+        number: "01",
+        title: "Buy research",
+        description:
+            "The agent scans open markets and purchases relevant sources through x402 micropayments. Each source is paid for instantly in USDC without subscriptions or manual approval.",
+        tag: "x402 · Nanopayments",
+        icon: FileSearch,
+        primary: "#8B5CF6",
+        secondary: "#D946EF",
+        soft: "#F5EEFF",
+        border: "rgba(139, 92, 246, 0.3)",
+        text: "#6D28D9",
+        shadow: "rgba(139, 92, 246, 0.28)",
+    },
+    {
+        number: "02",
+        title: "Form an estimate",
+        description:
+            "Sources enter a structured reasoning loop. The agent produces a probability, confidence score, and supporting evidence that can be inspected and verified.",
+        tag: "LLM · Structured output",
+        icon: BrainCircuit,
+        primary: "#A855F7",
+        secondary: "#6366F1",
+        soft: "#F3EEFF",
+        border: "rgba(168, 85, 247, 0.3)",
+        text: "#7E22CE",
+        shadow: "rgba(168, 85, 247, 0.28)",
+    },
+    {
+        number: "03",
+        title: "Stake USDC",
+        description:
+            "When the estimated edge exceeds its threshold, the agent calculates position size and purchases YES or NO shares directly through the Arc market contract.",
+        tag: "CPMM · Arc · Circle Wallets",
+        icon: Coins,
+        primary: "#3B82F6",
+        secondary: "#6366F1",
+        soft: "#EEF4FF",
+        border: "rgba(59, 130, 246, 0.3)",
+        text: "#2563EB",
+        shadow: "rgba(59, 130, 246, 0.28)",
+    },
+    {
+        number: "04",
+        title: "Settle and redeem",
+        description:
+            "The market closes, the outcome is resolved, and funds are released through deterministic settlement. Winning positions can redeem their USDC immediately.",
+        tag: "ERC-8183 · Arcscan",
+        icon: ShieldCheck,
+        primary: "#6366F1",
+        secondary: "#8B5CF6",
+        soft: "#F0EEFF",
+        border: "rgba(99, 102, 241, 0.3)",
+        text: "#4F46E5",
+        shadow: "rgba(99, 102, 241, 0.3)",
+    },
+];
 
-const variants: Variants = {
-    enter: (dir: number) => ({
-        rotateX: dir > 0 ? -90 : 90,
+const cardVariants: Variants = {
+    enter: (direction: number) => ({
+        rotateX: direction > 0 ? -72 : 72,
         opacity: 0,
-        scale: 0.95,
+        y: direction > 0 ? 18 : -18,
+        scale: 0.97,
     }),
     center: {
         rotateX: 0,
         opacity: 1,
+        y: 0,
         scale: 1,
         transition: {
-            duration: 0.5,
-            ease: [0.22, 1, 0.36, 1] as [number, number, number, number],
+            duration: 0.55,
+            ease: [0.22, 1, 0.36, 1],
         },
     },
-    exit: (dir: number) => ({
-        rotateX: dir > 0 ? 90 : -90,
+    exit: (direction: number) => ({
+        rotateX: direction > 0 ? 72 : -72,
         opacity: 0,
-        scale: 0.95,
+        y: direction > 0 ? -18 : 18,
+        scale: 0.97,
         transition: {
-            duration: 0.35,
-            ease: [0.55, 0, 1, 0.45] as [number, number, number, number],
+            duration: 0.32,
+            ease: [0.55, 0, 1, 0.45],
         },
     }),
 };
 
 export default function HowItWorks() {
     const [active, setActive] = useState(0);
-    const [dir, setDir] = useState(1);
-    const reduce = useReducedMotion();
-    const sectionRef = useRef<HTMLDivElement>(null);
-    const lastScrollY = useRef(0);
-    const isAnimating = useRef(false);
-    const accumulated = useRef(0);
+    const [direction, setDirection] = useState(1);
 
-    const go = (next: number) => {
+    const reduceMotion = useReducedMotion();
+    const sectionRef = useRef<HTMLElement>(null);
+    const isAnimating = useRef(false);
+    const accumulatedScroll = useRef(0);
+    const touchStart = useRef(0);
+
+    const step = STEPS[active];
+    const Icon = step.icon;
+
+    const goToStep = (next: number) => {
         if (isAnimating.current) return;
         if (next < 0 || next >= STEPS.length) return;
+        if (next === active) return;
+
         isAnimating.current = true;
-        setDir(next > active ? 1 : -1);
+        setDirection(next > active ? 1 : -1);
         setActive(next);
-        setTimeout(() => {
+
+        window.setTimeout(() => {
             isAnimating.current = false;
         }, 550);
     };
 
     useEffect(() => {
-        if (reduce) return;
+        if (reduceMotion) return;
 
-        const onWheel = (e: WheelEvent) => {
+        const onWheel = (event: WheelEvent) => {
             const section = sectionRef.current;
+
             if (!section) return;
 
             const rect = section.getBoundingClientRect();
 
-            // section must be nearly fully in view — tight window
-            const fullyInView = rect.top >= -20 && rect.top <= window.innerHeight * 0.15;
-            if (!fullyInView) return;
+            const sectionIsActive =
+                rect.top >= -30 &&
+                rect.top <= window.innerHeight * 0.18;
 
-            // only intercept if we're not at boundaries
-            const atStart = active === 0 && e.deltaY < 0;
-            const atEnd = active === STEPS.length - 1 && e.deltaY > 0;
+            if (!sectionIsActive) return;
 
-            // let natural scroll pass through at boundaries
-            if (atStart || atEnd) return;
+            const movingBackward = event.deltaY < 0;
+            const movingForward = event.deltaY > 0;
 
-            // we own this scroll — prevent page from moving
-            e.preventDefault();
+            const atFirstStep = active === 0 && movingBackward;
+            const atLastStep =
+                active === STEPS.length - 1 && movingForward;
 
-            accumulated.current += e.deltaY;
-            if (Math.abs(accumulated.current) < 60) return;
+            if (atFirstStep || atLastStep) return;
 
-            const direction = accumulated.current > 0 ? 1 : -1;
-            accumulated.current = 0;
-            go(active + direction);
+            event.preventDefault();
+
+            accumulatedScroll.current += event.deltaY;
+
+            if (Math.abs(accumulatedScroll.current) < 65) return;
+
+            const nextDirection =
+                accumulatedScroll.current > 0 ? 1 : -1;
+
+            accumulatedScroll.current = 0;
+
+            goToStep(active + nextDirection);
         };
 
-        window.addEventListener("wheel", onWheel, { passive: false });
-        return () => window.removeEventListener("wheel", onWheel);
-    }, [active, reduce]);
+        window.addEventListener("wheel", onWheel, {
+            passive: false,
+        });
 
-    // touch support
-    const touchStart = useRef(0);
-    const onTouchStart = (e: React.TouchEvent) =>
-        (touchStart.current = e.touches[0].clientY);
-    const onTouchEnd = (e: React.TouchEvent) => {
-        const delta = touchStart.current - e.changedTouches[0].clientY;
-        if (Math.abs(delta) < 30) return;
-        go(active + (delta > 0 ? 1 : -1));
+        return () => {
+            window.removeEventListener("wheel", onWheel);
+        };
+    }, [active, reduceMotion]);
+
+    const onTouchStart = (
+        event: React.TouchEvent<HTMLElement>,
+    ) => {
+        touchStart.current = event.touches[0].clientY;
     };
 
-    const step = STEPS[active];
-    const isLast = active === STEPS.length - 1;
+    const onTouchEnd = (
+        event: React.TouchEvent<HTMLElement>,
+    ) => {
+        const delta =
+            touchStart.current -
+            event.changedTouches[0].clientY;
+
+        if (Math.abs(delta) < 35) return;
+
+        goToStep(active + (delta > 0 ? 1 : -1));
+    };
 
     return (
         <section
             id="how"
             ref={sectionRef}
-            className="py-24 pb-8"
+            className="relative overflow-hidden pb-16 pt-24"
             onTouchStart={onTouchStart}
             onTouchEnd={onTouchEnd}
         >
-            {/* centered header */}
+            {/* Background */}
+            <div className="pointer-events-none absolute inset-0">
+                <div className="absolute left-[-180px] top-40 h-[440px] w-[440px] rounded-full bg-violet-300/10 blur-[150px]" />
+
+                <div className="absolute right-[-180px] top-48 h-[440px] w-[440px] rounded-full bg-blue-300/10 blur-[150px]" />
+
+                <div
+                    className="absolute inset-0 opacity-[0.025]"
+                    style={{
+                        backgroundImage: `
+                            linear-gradient(
+                                to right,
+                                rgba(99, 102, 241, 0.2) 1px,
+                                transparent 1px
+                            ),
+                            linear-gradient(
+                                to bottom,
+                                rgba(99, 102, 241, 0.2) 1px,
+                                transparent 1px
+                            )
+                        `,
+                        backgroundSize: "48px 48px",
+                        maskImage:
+                            "linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)",
+                        WebkitMaskImage:
+                            "linear-gradient(to bottom, transparent, black 20%, black 80%, transparent)",
+                    }}
+                />
+            </div>
+
+            {/* Header */}
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                initial={
+                    reduceMotion
+                        ? { opacity: 1 }
+                        : { opacity: 0, y: 16 }
+                }
+                whileInView={{
+                    opacity: 1,
+                    y: 0,
+                }}
                 viewport={{ once: true }}
                 transition={{ duration: 0.45 }}
-                className="mx-auto mb-16 flex max-w-2xl flex-col items-center px-6 text-center"
+                className="relative mx-auto mb-12 flex max-w-2xl flex-col items-center px-6 text-center"
             >
-                <span className="flex items-center gap-2 rounded-full border border-line bg-surface px-4 py-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted">
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: "#6EE7FF" }} />
-                    How it works
-                </span>
+                <div className="inline-flex rounded-full bg-gradient-to-r from-violet-500 to-blue-500 p-px">
+                    <div className="flex items-center gap-2 rounded-full bg-[#fbf8f2] px-4 py-2">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-500 opacity-40" />
+
+                            <span className="relative h-2 w-2 rounded-full bg-violet-500" />
+                        </span>
+
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-600">
+                            How it works
+                        </span>
+                    </div>
+                </div>
+
                 <h2
-                    className="mt-5 text-3xl leading-tight tracking-tight lg:text-5xl uppercase"
+                    className="mt-6 text-[42px] font-black uppercase leading-[0.92] tracking-[-0.055em] text-slate-950 sm:text-[52px]"
                     style={{
                         fontFamily: "var(--font-display)",
-                        letterSpacing: "-0.03em",
-                        lineHeight: "0.95",
-                        backgroundImage: "linear-gradient(135deg, #1c1d1f 60%, #6b6e73)",
-                        WebkitBackgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        backgroundClip: "text",
                     }}
                 >
-                    Four steps. Zero humans.
+                    Four steps.{" "}
+                    <span className="bg-gradient-to-r from-violet-600 to-blue-500 bg-clip-text text-transparent">
+                        Zero guesswork.
+                    </span>
                 </h2>
-                <p className="mt-4 max-w-lg text-base text-muted"
+
+                <p
+                    className="mt-5 max-w-xl text-[16px] font-medium leading-[1.7] tracking-[-0.012em] text-muted"
                     style={{
-                        fontWeight: 500,
-                        letterSpacing: "-0.01em",
-                        borderLeft: "2px solid #38BDF8",
-                        paddingLeft: "1rem",
-                    }}>
-                    Every decision , research, reasoning, staking, settlement are made
-                    and paid for by the agent. Scroll to step through.
+                        fontFamily: "var(--font-sans)",
+                    }}
+                >
+                    Research, reasoning, trading, and settlement are
+                    handled autonomously by the agent and recorded onchain.
                 </p>
             </motion.div>
 
-            {/* flip card + controls */}
-            <div className="mx-auto max-w-2xl px-6">
-                {/* progress dots */}
-                <div className="mb-8 flex items-center justify-center gap-2">
-                    {STEPS.map((s, i) => (
-                        <button
-                            key={s.number}
-                            onClick={() => go(i)}
-                            className="transition-all duration-300 rounded-full"
-                            style={{
-                                width: i === active ? "2rem" : "0.5rem",
-                                height: "0.5rem",
-                                background: i === active ? "#38BDF8" : "var(--color-line)",
-                            }}
-                        />
-                    ))}
+            <div className="relative mx-auto max-w-4xl px-6">
+                {/* Step navigation */}
+                <div className="mb-6 grid grid-cols-4 gap-2">
+                    {STEPS.map((item, index) => {
+                        const StepIcon = item.icon;
+                        const completed = index < active;
+                        const selected = index === active;
+
+                        return (
+                            <button
+                                key={item.number}
+                                type="button"
+                                onClick={() => goToStep(index)}
+                                className="relative flex min-w-0 flex-col items-center rounded-[16px] border px-2 py-3 transition-all duration-300"
+                                style={{
+                                    borderColor: selected
+                                        ? step.border
+                                        : "rgba(15, 23, 42, 0.1)",
+                                    background: selected
+                                        ? step.soft
+                                        : "rgba(255, 255, 255, 0.5)",
+                                    transform: selected
+                                        ? "translateY(-3px)"
+                                        : "translateY(0)",
+                                }}
+                            >
+                                <div
+                                    className="flex h-8 w-8 items-center justify-center rounded-[10px]"
+                                    style={{
+                                        color:
+                                            selected || completed
+                                                ? item.text
+                                                : "#94A3B8",
+                                        background:
+                                            selected || completed
+                                                ? item.soft
+                                                : "rgba(15, 23, 42, 0.04)",
+                                    }}
+                                >
+                                    {completed ? (
+                                        <Check className="h-4 w-4" />
+                                    ) : (
+                                        <StepIcon className="h-4 w-4" />
+                                    )}
+                                </div>
+
+                                <span
+                                    className="mt-2 font-mono text-[9px] font-black"
+                                    style={{
+                                        color: selected
+                                            ? item.text
+                                            : "#94A3B8",
+                                    }}
+                                >
+                                    {item.number}
+                                </span>
+
+                                <span className="mt-1 hidden truncate text-[8px] font-black uppercase tracking-[0.12em] text-slate-500 sm:block">
+                                    {item.title}
+                                </span>
+                            </button>
+                        );
+                    })}
                 </div>
 
-                {/* the flip card */}
-                <div style={{ perspective: "1200px" }}>
-                    <AnimatePresence mode="wait" custom={dir}>
-                        <motion.div
+                {/* Main collectible card */}
+                <div
+                    className="relative"
+                    style={{
+                        perspective: "1400px",
+                    }}
+                >
+                    <AnimatePresence
+                        mode="wait"
+                        custom={direction}
+                    >
+                        <motion.article
                             key={active}
-                            custom={dir}
-                            variants={reduce ? undefined : variants}
+                            custom={direction}
+                            variants={
+                                reduceMotion
+                                    ? undefined
+                                    : cardVariants
+                            }
                             initial="enter"
                             animate="center"
                             exit="exit"
-                            style={{ transformStyle: "preserve-3d" }}
-                            className={`w-full rounded-2xl p-10 ${isLast
-                                ? "bg-ink text-surface"
-                                : "border border-line bg-surface"
-                                }`}
+                            style={{
+                                transformStyle: "preserve-3d",
+                            }}
+                            className="relative"
                         >
-                            {/* step number */}
-                            <p
-                                className={`font-mono text-[11px] font-semibold uppercase tracking-widest ${isLast ? "text-muted" : "text-muted"
-                                    }`}
+                            <div
+                                className="relative overflow-hidden rounded-[28px] p-[3px]"
+                                style={{
+                                    background: `linear-gradient(
+                                        135deg,
+                                        ${step.primary},
+                                        ${step.secondary}
+                                    )`,
+                                    boxShadow: `
+                                        0 28px 65px -36px ${step.shadow},
+                                        0 16px 38px rgba(15, 23, 42, 0.1)
+                                    `,
+                                }}
                             >
-                                Step {step.number} / {STEPS.length}
-                            </p>
+                                <div
+                                    className="relative overflow-hidden rounded-[25px] px-6 pb-6 pt-16 sm:px-9 sm:pb-8"
+                                    style={{
+                                        background: `
+                                            radial-gradient(
+                                                circle at 88% 8%,
+                                                ${step.soft},
+                                                transparent 38%
+                                            ),
+                                            linear-gradient(
+                                                145deg,
+                                                #fffdf8 0%,
+                                                #f8f3eb 100%
+                                            )
+                                        `,
+                                    }}
+                                >
+                                    {/* Paper grain */}
+                                    <div
+                                        className="pointer-events-none absolute inset-0 opacity-[0.032] mix-blend-multiply"
+                                        style={{
+                                            backgroundImage:
+                                                "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.9'/%3E%3C/svg%3E\")",
+                                        }}
+                                    />
 
-                            {/* title */}
-                            <h3
-                                className={`mt-4 text-4xl font-bold uppercase leading-tight ${isLast ? "text-surface" : "text-ink"
-                                    }`}
-                                style={{ fontFamily: "var(--font-display)" }}
-                            >
-                                {step.title}
-                            </h3>
+                                    {/* Top tab */}
+                                    <div
+                                        className="absolute left-0 top-0 flex h-11 items-center rounded-br-[20px] px-6"
+                                        style={{
+                                            background: `linear-gradient(
+                                                135deg,
+                                                ${step.primary},
+                                                ${step.secondary}
+                                            )`,
+                                        }}
+                                    >
+                                        <span className="text-[10px] font-black uppercase tracking-[0.22em] text-white">
+                                            Step {step.number}
+                                        </span>
 
-                            {/* description */}
-                            <p
-                                className={`mt-5 text-base leading-relaxed ${isLast ? "text-muted" : "text-muted"
-                                    }`}
-                            >
-                                {step.description}
-                            </p>
+                                        <Sparkles className="ml-2 h-3.5 w-3.5 text-white" />
+                                    </div>
 
-                            {/* tag */}
-                            <span
-                                className="mt-8 inline-block rounded-full px-3.5 py-1.5 font-mono text-[10px] font-semibold uppercase tracking-wider"
-                                style={
-                                    step.terminal
-                                        ? { background: "rgba(255,255,255,0.1)", color: "var(--color-surface)" }
-                                        : { background: "#ecfeff", color: "#0EA5E9", border: "1px solid #6EE7FF" }
-                                }
-                            >
-                                {step.tag}
-                            </span>
+                                    <span className="absolute right-6 top-5 font-mono text-[9px] font-black tracking-[0.15em] text-slate-400">
+                                        {active + 1}/{STEPS.length}
+                                    </span>
 
-                            {/* progress bar */}
-                            <div className="mt-8 h-px w-full bg-line overflow-hidden rounded-full">
-                                <motion.div
-                                    className="h-full rounded-full"
-                                    style={{ background: step.terminal ? "var(--color-surface)" : "#38BDF8" }}
-                                    initial={false}
-                                    animate={{ width: `${((active + 1) / STEPS.length) * 100}%` }}
-                                    transition={{ duration: 0.4, ease: "easeOut" }}
-                                />
+                                    <div className="relative grid gap-7 sm:grid-cols-[150px_1fr] sm:items-center">
+                                        {/* Icon panel */}
+                                        <div
+                                            className="relative mx-auto flex h-[140px] w-[140px] items-center justify-center overflow-hidden rounded-[28px] border"
+                                            style={{
+                                                borderColor:
+                                                    step.border,
+                                                background: `
+                                                    radial-gradient(
+                                                        circle at 35% 25%,
+                                                        rgba(255,255,255,0.95),
+                                                        transparent 30%
+                                                    ),
+                                                    linear-gradient(
+                                                        145deg,
+                                                        ${step.soft},
+                                                        rgba(255,255,255,0.75)
+                                                    )
+                                                `,
+                                            }}
+                                        >
+                                            <motion.div
+                                                animate={
+                                                    reduceMotion
+                                                        ? {}
+                                                        : {
+                                                            rotate: [
+                                                                0,
+                                                                4,
+                                                                -4,
+                                                                0,
+                                                            ],
+                                                            scale: [
+                                                                1,
+                                                                1.05,
+                                                                1,
+                                                            ],
+                                                        }
+                                                }
+                                                transition={{
+                                                    duration: 4,
+                                                    repeat: Infinity,
+                                                    ease: "easeInOut",
+                                                }}
+                                            >
+                                                <Icon
+                                                    className="h-16 w-16"
+                                                    strokeWidth={1.5}
+                                                    style={{
+                                                        color: step.text,
+                                                    }}
+                                                />
+                                            </motion.div>
+
+                                            <div
+                                                className="absolute inset-x-5 bottom-4 h-1 overflow-hidden rounded-full bg-black/[0.06]"
+                                            >
+                                                <motion.div
+                                                    initial={{ width: 0 }}
+                                                    animate={{
+                                                        width: `${((active + 1) / STEPS.length) * 100}%`,
+                                                    }}
+                                                    transition={{
+                                                        duration: 0.45,
+                                                        ease: "easeOut",
+                                                    }}
+                                                    className="h-full rounded-full"
+                                                    style={{
+                                                        background: `linear-gradient(
+                                                            90deg,
+                                                            ${step.primary},
+                                                            ${step.secondary}
+                                                        )`,
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Step content */}
+                                        <div>
+                                            <p
+                                                className="text-[10px] font-black uppercase tracking-[0.2em]"
+                                                style={{
+                                                    color: step.text,
+                                                }}
+                                            >
+                                                Autonomous workflow
+                                            </p>
+
+                                            <h3
+                                                className="mt-3 text-[34px] font-black uppercase leading-[0.94] tracking-[-0.05em] text-slate-950 sm:text-[44px]"
+                                                style={{
+                                                    fontFamily:
+                                                        "var(--font-display)",
+                                                }}
+                                            >
+                                                {step.title}
+                                            </h3>
+
+                                            <p
+                                                className="mt-5 max-w-xl text-[15px] font-medium leading-[1.75] tracking-[-0.01em] text-slate-600"
+                                                style={{
+                                                    fontFamily:
+                                                        "var(--font-sans)",
+                                                }}
+                                            >
+                                                {step.description}
+                                            </p>
+
+                                            <div
+                                                className="mt-6 inline-flex items-center gap-2 rounded-full border px-3.5 py-2"
+                                                style={{
+                                                    borderColor:
+                                                        step.border,
+                                                    color: step.text,
+                                                    background: step.soft,
+                                                }}
+                                            >
+                                                <span
+                                                    className="h-1.5 w-1.5 rounded-full"
+                                                    style={{
+                                                        background:
+                                                            step.primary,
+                                                    }}
+                                                />
+
+                                                <span className="font-mono text-[9px] font-black uppercase tracking-[0.15em]">
+                                                    {step.tag}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Footer */}
+                                    <div className="relative mt-8 flex items-center justify-between border-t border-black/10 pt-4">
+                                        <div>
+                                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                                Bruh protocol
+                                            </p>
+
+                                            <p className="mt-1 text-[10px] font-semibold text-slate-500">
+                                                Autonomous market execution
+                                            </p>
+                                        </div>
+
+                                        <span
+                                            className="font-mono text-[11px] font-black"
+                                            style={{
+                                                color: step.text,
+                                            }}
+                                        >
+                                            #{step.number}
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
-                        </motion.div>
+                        </motion.article>
                     </AnimatePresence>
                 </div>
 
-                {/* prev / next buttons */}
+                {/* Controls */}
                 <div className="mt-6 flex items-center justify-between">
-                    <button
-                        onClick={() => go(active - 1)}
+                    <motion.button
+                        type="button"
+                        onClick={() => goToStep(active - 1)}
                         disabled={active === 0}
-                        className="rounded-full border border-line px-5 py-2.5 text-sm font-semibold text-ink transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                        onMouseEnter={e => {
-                            e.currentTarget.style.borderColor = "#22D3EE";
-                            e.currentTarget.style.color = "#0EA5E9";
-                        }}
-                        onMouseLeave={e => {
-                            e.currentTarget.style.borderColor = "var(--color-line)";
-                            e.currentTarget.style.color = "var(--color-ink)";
+                        whileHover={
+                            active === 0
+                                ? {}
+                                : { y: -2 }
+                        }
+                        whileTap={
+                            active === 0
+                                ? {}
+                                : { scale: 0.98 }
+                        }
+                        className="flex items-center gap-2 rounded-[13px] border px-4 py-2.5 text-[11px] font-black transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+                        style={{
+                            borderColor: step.border,
+                            color: step.text,
+                            background: "#fffdf8",
                         }}
                     >
-                        ← Prev
-                    </button>
-                    <span className="font-mono text-[12px] text-muted">
-                        {active + 1} / {STEPS.length}
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Previous
+                    </motion.button>
+
+                    <span className="font-mono text-[10px] font-black tracking-[0.15em] text-slate-400">
+                        {String(active + 1).padStart(2, "0")} /{" "}
+                        {String(STEPS.length).padStart(2, "0")}
                     </span>
-                    <button
-                        onClick={() => go(active + 1)}
+
+                    <motion.button
+                        type="button"
+                        onClick={() => goToStep(active + 1)}
                         disabled={active === STEPS.length - 1}
-                        className="rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                        style={{ background: "#38BDF8" }}
-                        onMouseEnter={e => (e.currentTarget.style.background = "#0EA5E9")}
-                        onMouseLeave={e => (e.currentTarget.style.background = "#38BDF8")}
+                        whileHover={
+                            active === STEPS.length - 1
+                                ? {}
+                                : { y: -2 }
+                        }
+                        whileTap={
+                            active === STEPS.length - 1
+                                ? {}
+                                : { scale: 0.98 }
+                        }
+                        className="flex items-center gap-2 rounded-[13px] px-4 py-2.5 text-[11px] font-black text-white transition-opacity disabled:cursor-not-allowed disabled:opacity-30"
+                        style={{
+                            background: `linear-gradient(
+                                135deg,
+                                ${step.primary},
+                                ${step.secondary}
+                            )`,
+                            boxShadow: `0 12px 24px -16px ${step.shadow}`,
+                        }}
                     >
-                        Next →
-                    </button>
+                        Next
+                        <ArrowRight className="h-3.5 w-3.5" />
+                    </motion.button>
                 </div>
             </div>
         </section>

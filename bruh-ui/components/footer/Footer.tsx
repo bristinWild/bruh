@@ -1,111 +1,118 @@
 "use client";
 
 import { motion, useReducedMotion } from "framer-motion";
-import Image from "next/image";
+import {
+    ArrowUpRight,
+    CircleDot,
 
-const LINKS = {
-    Product: ["Markets", "Agents", "How it works", "Docs"],
-    "Built with": ["Arc Testnet", "Circle USDC", "x402 Protocol", "ERC-8183"],
-    Hackathon: ["Encode × Circle", "Agentic Economy", "Submit by Aug 9", "arcscan"],
+    Sparkles,
+} from "lucide-react";
+
+const FOOTER_LINKS = {
+    Product: [
+        { label: "Markets", href: "#markets" },
+        { label: "Agents", href: "#agents" },
+        { label: "How it works", href: "#how" },
+    ],
+    Resources: [
+        { label: "Docs", href: "#" },
+        { label: "GitHub", href: "#" },
+        { label: "Arcscan", href: "#" },
+    ],
+    "Built with": [
+        { label: "Arc Testnet", href: "#" },
+        { label: "Circle USDC", href: "#" },
+        { label: "x402 Protocol", href: "#" },
+        { label: "ERC-8183", href: "#" },
+    ],
 };
 
 export default function Footer() {
-    const reduce = useReducedMotion();
+    const reduceMotion = useReducedMotion();
 
     return (
-        <footer className="relative overflow-hidden border-t border-line">
+        <>
 
-            {/* speed lines */}
-            <div className="pointer-events-none absolute inset-0">
-                <svg className="h-full w-full" viewBox="0 0 1440 320" preserveAspectRatio="xMidYMid slice" fill="none">
-                    {[
-                        { x1: 0, x2: 420, y: 40, op: 0.06, dur: 2.1 },
-                        { x1: 0, x2: 680, y: 88, op: 0.04, dur: 1.7 },
-                        { x1: 200, x2: 900, y: 130, op: 0.07, dur: 2.4 },
-                        { x1: 0, x2: 560, y: 172, op: 0.05, dur: 1.9 },
-                        { x1: 400, x2: 1100, y: 210, op: 0.08, dur: 2.6 },
-                        { x1: 100, x2: 750, y: 248, op: 0.04, dur: 2.0 },
-                        { x1: 0, x2: 440, y: 284, op: 0.06, dur: 1.8 },
-                        { x1: 600, x2: 1440, y: 60, op: 0.05, dur: 2.3 },
-                        { x1: 800, x2: 1440, y: 160, op: 0.07, dur: 1.6 },
-                        { x1: 900, x2: 1440, y: 230, op: 0.04, dur: 2.2 },
-                        { x1: 1000, x2: 1440, y: 300, op: 0.06, dur: 1.9 },
-                    ].map((l, i) => (
-                        <motion.line
-                            key={i}
-                            x1={l.x1} y1={l.y}
-                            x2={l.x1} y2={l.y}
-                            stroke={i % 3 === 0 ? "#38BDF8" : i % 3 === 1 ? "#6EE7FF" : "#0EA5E9"}
-                            strokeWidth={i % 3 === 0 ? 1.5 : 0.75}
-                            strokeLinecap="round"
-                            opacity={l.op}
-                            animate={reduce ? {} : {
-                                x1: [l.x1, l.x2 + 200],
-                                x2: [l.x1 + (l.x2 - l.x1), l.x2 + 200 + (l.x2 - l.x1)],
-                            }}
-                            transition={{ duration: l.dur, repeat: Infinity, ease: "linear", delay: i * 0.18 }}
-                        />
-                    ))}
-                </svg>
-            </div>
+            {/* Actual footer */}
+            <footer className="relative border-t border-black/10 bg-[#faf8f3]">
+                <div className="mx-auto max-w-6xl px-6 py-14">
+                    <div className="grid gap-12 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
+                        {/* Brand */}
+                        <div>
 
 
-
-            {/* links + meta */}
-            <div className="relative mx-auto max-w-6xl px-6 py-15">
-                <div className="grid grid-cols-2 gap-10 sm:grid-cols-4">
-
-                    {/* col 1 — description */}
-                    <div className="col-span-2 sm:col-span-1 flex flex-col gap-3">
-                        <p className="text-xs text-muted leading-relaxed">
-                            Autonomous forecasting agents on Arc. Built for the Programmable Money Hackathon.
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted">
-                            <span className="relative flex h-1.5 w-1.5">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yes opacity-60" />
-                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yes" />
-                            </span>
-                            Arc Testnet · live
-                        </div>
-                    </div>
-
-                    {/* cols 2-4 — links */}
-                    {Object.entries(LINKS).map(([heading, items]) => (
-                        <div key={heading} className="flex flex-col gap-4">
-                            <p className="text-[11px] font-semibold uppercase tracking-widest text-ink">
-                                {heading}
+                            <p className="mt-5 max-w-[260px] text-[12px] font-medium leading-[1.7] text-slate-500">
+                                Autonomous forecasting agents powered
+                                by programmable money and transparent
+                                onchain execution.
                             </p>
-                            <ul className="flex flex-col gap-2.5">
-                                {items.map((item) => (
-                                    <li key={item}>
-                                        <a href="#" className="text-sm text-muted transition-colors hover:text-ink">
-                                            {item}
-                                        </a>
-                                    </li>
-                                ))}
-                            </ul>
+
+                            <div className="mt-6 flex items-center gap-2">
+
+
+                                <a
+                                    href="#"
+                                    className="flex h-9 items-center gap-2 rounded-[10px] border border-black/10 px-3 text-[9px] font-black uppercase tracking-[0.12em] text-slate-500 transition-colors hover:border-blue-300 hover:text-blue-600"
+                                >
+                                    <CircleDot className="h-3.5 w-3.5" />
+                                    Arcscan
+                                </a>
+                            </div>
                         </div>
-                    ))}
 
-                </div>
+                        {/* Links */}
+                        {Object.entries(FOOTER_LINKS).map(
+                            ([heading, items]) => (
+                                <div key={heading}>
+                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-950">
+                                        {heading}
+                                    </p>
 
-                {/* bottom bar */}
-                <div className="mt-16 flex flex-col items-start gap-3 border-t border-line pt-8 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="font-mono text-[11px] text-muted">
-                        © 2026 Bruh · Built on Arc · Encode × Circle Hackathon
-                    </p>
-                    <div className="flex items-center gap-4">
-                        <span className="font-mono text-[11px] text-muted">
-                            Final submission: Sun 9 Aug 2026
-                        </span>
-                        <span className="h-1 w-1 rounded-full bg-line" />
-                        <a href="#" className="font-mono text-[11px] text-muted transition-colors hover:text-ink">
-                            arcscan
-                        </a>
+                                    <ul className="mt-5 flex flex-col gap-3">
+                                        {items.map((item) => (
+                                            <li key={item.label}>
+                                                <a
+                                                    href={item.href}
+                                                    className="group inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 transition-colors hover:text-violet-600"
+                                                >
+                                                    {item.label}
+
+                                                    <ArrowUpRight className="h-3 w-3 opacity-0 transition-all group-hover:translate-x-0.5 group-hover:opacity-100" />
+                                                </a>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ),
+                        )}
+                    </div>
+
+                    {/* Bottom bar */}
+                    <div className="mt-12 flex flex-col gap-4 border-t border-black/10 pt-6 sm:flex-row sm:items-center sm:justify-between">
+                        <p className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                            © 2026 Bruh
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                Built on Arc
+                            </span>
+
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+                            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                Encode × Circle
+                            </span>
+
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+
+                            <span className="font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                                Agentic Economy
+                            </span>
+                        </div>
                     </div>
                 </div>
-            </div>
-
-        </footer>
+            </footer>
+        </>
     );
 }

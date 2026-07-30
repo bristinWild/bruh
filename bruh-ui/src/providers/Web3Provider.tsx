@@ -1,7 +1,7 @@
 "use client";
 
 import { RainbowKitProvider, getDefaultConfig, lightTheme } from "@rainbow-me/rainbowkit";
-import { metaMaskWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
+import { metaMaskWallet, okxWallet, coinbaseWallet, walletConnectWallet } from "@rainbow-me/rainbowkit/wallets";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import "@rainbow-me/rainbowkit/styles.css";
@@ -24,14 +24,19 @@ const config = getDefaultConfig({
     projectId: "fc4faa437744b2d6061f2f92db239b22",
     chains: [arcTestnet],
     ssr: true,
+    multiInjectedProviderDiscovery: false,
     wallets: [
         {
             groupName: "Popular",
-            wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet],
+            wallets: [
+                okxWallet,
+                metaMaskWallet,
+                coinbaseWallet,
+                walletConnectWallet,
+            ],
         },
     ],
 });
-
 const queryClient = new QueryClient();
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {

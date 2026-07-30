@@ -1,9 +1,20 @@
 "use client";
 
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import {
+    AnimatePresence,
+    motion,
+    useReducedMotion,
+    useScroll,
+    useTransform,
+} from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
-
+import {
+    ArrowUpRight,
+    Menu,
+    X,
+} from "lucide-react";
+import { useState } from "react";
 
 const NAV_LINKS = [
     { label: "Markets", href: "#markets" },
@@ -13,75 +24,255 @@ const NAV_LINKS = [
 ];
 
 export default function Navbar() {
-    const reduce = useReducedMotion();
+    const reduceMotion = useReducedMotion();
     const { scrollY } = useScroll();
 
-    const bgOpacity = useTransform(scrollY, [0, 40], [0, 1]);
-    const borderOpacity = useTransform(scrollY, [0, 40], [0, 1]);
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    const backgroundOpacity = useTransform(
+        scrollY,
+        [0, 50],
+        [0, 1],
+    );
+
+    const borderOpacity = useTransform(
+        scrollY,
+        [0, 50],
+        [0, 1],
+    );
+
+    const navScale = useTransform(
+        scrollY,
+        [0, 80],
+        [1, 0.985],
+    );
 
     return (
         <motion.header
-            initial={reduce ? { opacity: 1 } : { opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
+            initial={
+                reduceMotion
+                    ? { opacity: 1 }
+                    : { opacity: 0, y: -10 }
+            }
+            animate={{
+                opacity: 1,
+                y: 0,
+            }}
+            transition={{
+                duration: 0.45,
+                ease: [0.22, 1, 0.36, 1],
+            }}
             className="fixed inset-x-0 top-0 z-50"
         >
+            {/* Scrolled background */}
             <motion.div
-                className="absolute inset-0 bg-white/85 backdrop-blur-md"
-                style={{ opacity: bgOpacity }}
-            />
-            <motion.div
-                className="absolute inset-x-0 bottom-0 h-px bg-line"
-                style={{ opacity: borderOpacity }}
+                className="absolute inset-0 border-b border-transparent bg-[#fbf8f2]/88 backdrop-blur-xl"
+                style={{
+                    opacity: backgroundOpacity,
+                    borderColor:
+                        "rgba(15,23,42,0.08)",
+                }}
             />
 
-            <nav className="relative mx-auto flex max-w-6xl items-center px-6 py-2">
+            <motion.div
+                className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-300/40 to-transparent"
+                style={{
+                    opacity: borderOpacity,
+                }}
+            />
 
-                {/* left — logo wordmark */}
-                <Link href="/" className="flex items-center shrink-0">
+            <motion.nav
+                style={{
+                    scale: navScale,
+                }}
+                className="relative mx-auto flex max-w-6xl items-center px-6 py-3"
+            >
+                {/* Logo */}
+                <Link
+                    href="/"
+                    aria-label="Bruh home"
+                    className="flex shrink-0 items-center"
+                >
                     <Image
                         src="/bruh-new.png"
                         alt="Bruh"
                         width={840}
                         height={744}
-                        className="h-12 w-auto"
+                        priority
+                        className="h-11 w-auto sm:h-12"
                     />
                 </Link>
 
-                {/* center — nav links */}
-                <ul className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-2">
-                    {NAV_LINKS.map((link) => (
-                        <li key={link.label}>
-                            <Link
-                                href={link.href}
-                                className="rounded-full px-4 py-2 text-[13px] font-semibold uppercase tracking-wider text-muted transition-colors hover:bg-primary-soft hover:text-ink"
-                            >
-                                {link.label}
-                            </Link>
-                        </li>
-                    ))}
-                </ul>
-
-                {/* right — status + CTA */}
-                <div className="ml-auto flex items-center gap-5">
-                    <div className="hidden sm:flex items-center gap-2 text-[12px] font-medium uppercase tracking-wider text-muted">
-                        <span className="relative flex h-1.5 w-1.5">
-                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-yes opacity-60" />
-                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-yes" />
-                        </span>
-                        Arc Testnet
-                    </div>
-
-                    <Link
-                        href="#markets"
-                        className="flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white transition-transform hover:scale-[1.02] active:scale-[0.98] -mr-10"
+                {/* Desktop navigation */}
+                <div className="absolute left-1/2 hidden -translate-x-1/2 md:block">
+                    <ul
+                        className="flex items-center gap-1 rounded-full border px-1.5 py-1.5"
+                        style={{
+                            borderColor:
+                                "rgba(99,102,241,0.12)",
+                            background:
+                                "rgba(255,253,248,0.68)",
+                            boxShadow:
+                                "0 10px 28px -24px rgba(79,70,229,0.5)",
+                        }}
                     >
-                        View markets
-                        <span className="text-[11px] opacity-60">↗</span>
-                    </Link>
+                        {NAV_LINKS.map((link) => (
+                            <li key={link.label}>
+                                <Link
+                                    href={link.href}
+                                    className="group relative block rounded-full px-4 py-2 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 transition-colors hover:text-violet-600"
+                                >
+                                    <span className="relative z-10">
+                                        {link.label}
+                                    </span>
+
+                                    <span className="absolute inset-0 scale-90 rounded-full bg-gradient-to-r from-violet-100 to-blue-100 opacity-0 transition-all duration-200 group-hover:scale-100 group-hover:opacity-100" />
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
 
-            </nav>
+                {/* Right controls */}
+                <div className="ml-auto flex items-center gap-3">
+                    <div className="hidden items-center gap-2 rounded-full border border-black/10 bg-white/50 px-3 py-2 sm:flex">
+                        <span className="relative flex h-2 w-2">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40" />
+
+                            <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
+                        </span>
+
+                        <span className="font-mono text-[8px] font-black uppercase tracking-[0.16em] text-slate-500">
+                            Arc Testnet
+                        </span>
+                    </div>
+
+                    <motion.div
+                        whileHover={
+                            reduceMotion
+                                ? undefined
+                                : { y: -2 }
+                        }
+                        whileTap={{
+                            scale: 0.98,
+                        }}
+                        className="hidden sm:block"
+                    >
+                        <Link
+                            href="#markets"
+                            className="flex items-center gap-2 rounded-[13px] px-4 py-2.5 text-[10px] font-black text-white"
+                            style={{
+                                background:
+                                    "linear-gradient(135deg, #8B5CF6, #3B82F6)",
+                                boxShadow:
+                                    "0 14px 28px -18px rgba(79,70,229,0.75)",
+                            }}
+                        >
+                            View markets
+                            <ArrowUpRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </motion.div>
+
+                    {/* Mobile toggle */}
+                    <button
+                        type="button"
+                        aria-label={
+                            mobileOpen
+                                ? "Close navigation"
+                                : "Open navigation"
+                        }
+                        onClick={() =>
+                            setMobileOpen((open) => !open)
+                        }
+                        className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-black/10 bg-white/60 text-slate-700 md:hidden"
+                    >
+                        {mobileOpen ? (
+                            <X className="h-4.5 w-4.5" />
+                        ) : (
+                            <Menu className="h-4.5 w-4.5" />
+                        )}
+                    </button>
+                </div>
+            </motion.nav>
+
+            {/* Mobile menu */}
+            <AnimatePresence>
+                {mobileOpen && (
+                    <motion.div
+                        initial={
+                            reduceMotion
+                                ? { opacity: 1 }
+                                : {
+                                    opacity: 0,
+                                    y: -10,
+                                    scale: 0.98,
+                                }
+                        }
+                        animate={{
+                            opacity: 1,
+                            y: 0,
+                            scale: 1,
+                        }}
+                        exit={{
+                            opacity: 0,
+                            y: -10,
+                            scale: 0.98,
+                        }}
+                        transition={{
+                            duration: 0.22,
+                        }}
+                        className="px-4 pb-4 md:hidden"
+                    >
+                        <div
+                            className="mx-auto max-w-6xl overflow-hidden rounded-[20px] border p-3"
+                            style={{
+                                borderColor:
+                                    "rgba(99,102,241,0.14)",
+                                background: `
+                                    radial-gradient(
+                                        circle at 10% 0%,
+                                        rgba(139,92,246,0.1),
+                                        transparent 36%
+                                    ),
+                                    rgba(255,253,248,0.96)
+                                `,
+                                boxShadow:
+                                    "0 24px 55px -36px rgba(79,70,229,0.4)",
+                            }}
+                        >
+                            <div className="flex flex-col gap-1">
+                                {NAV_LINKS.map((link) => (
+                                    <Link
+                                        key={link.label}
+                                        href={link.href}
+                                        onClick={() =>
+                                            setMobileOpen(false)
+                                        }
+                                        className="rounded-[12px] px-4 py-3 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600 transition-colors hover:bg-violet-50 hover:text-violet-600"
+                                    >
+                                        {link.label}
+                                    </Link>
+                                ))}
+                            </div>
+
+                            <Link
+                                href="#markets"
+                                onClick={() =>
+                                    setMobileOpen(false)
+                                }
+                                className="mt-3 flex items-center justify-center gap-2 rounded-[13px] px-4 py-3 text-[10px] font-black text-white"
+                                style={{
+                                    background:
+                                        "linear-gradient(135deg, #8B5CF6, #3B82F6)",
+                                }}
+                            >
+                                View markets
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                            </Link>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </motion.header>
     );
 }
