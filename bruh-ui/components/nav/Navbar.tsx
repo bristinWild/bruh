@@ -85,21 +85,21 @@ export default function Navbar() {
                 style={{
                     scale: navScale,
                 }}
-                className="relative mx-auto flex max-w-6xl items-center px-6 py-3"
+                className="relative mx-auto flex h-[72px] max-w-6xl items-center px-6"
             >
                 {/* Logo */}
                 <Link
                     href="/"
                     aria-label="Bruh home"
-                    className="flex shrink-0 items-center"
+                    className="absolute left-6 top-1/2 flex -translate-y-1/2 items-center"
                 >
                     <Image
-                        src="/bruh-new.png"
+                        src="/bruh-new-logo-wbg.png"
                         alt="Bruh"
                         width={840}
                         height={744}
                         priority
-                        className="h-11 w-auto sm:h-12"
+                        className="h-[62px] w-auto sm:h-[68px]"
                     />
                 </Link>
 
@@ -159,7 +159,7 @@ export default function Navbar() {
                         className="hidden sm:block"
                     >
                         <Link
-                            href="#markets"
+                            href="/markets"
                             className="flex items-center gap-2 rounded-[13px] px-4 py-2.5 text-[10px] font-black text-white"
                             style={{
                                 background:
@@ -256,7 +256,7 @@ export default function Navbar() {
                             </div>
 
                             <Link
-                                href="#markets"
+                                href="/markets"
                                 onClick={() =>
                                     setMobileOpen(false)
                                 }

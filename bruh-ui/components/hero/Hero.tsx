@@ -254,7 +254,7 @@ export default function Hero() {
                         className="mt-8 flex flex-wrap gap-3"
                     >
                         <motion.a
-                            href="#markets"
+                            href="/markets"
                             whileHover={
                                 reduce
                                     ? {}

@@ -1,55 +1,108 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { useAccount, useSignMessage } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import {
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    Fingerprint,
+    LockKeyhole,
+    ShieldCheck,
+    Sparkles,
+    Wallet,
+    Zap,
+} from "lucide-react";
 import { getNonce, verifySignature } from "@/src/lib/api";
 
 export default function GetStarted() {
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const { address, isConnected } = useAccount();
-    const { signMessageAsync } = useSignMessage();
+    const reduceMotion = useReducedMotion();
     const router = useRouter();
 
-    useEffect(() => {
-        if (isConnected && address) handleAuth();
-    }, [isConnected, address]);
+    const { address, isConnected } = useAccount();
+    const { signMessageAsync } = useSignMessage();
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     async function handleAuth() {
+        if (!address || loading) return;
+
         setLoading(true);
         setError(null);
+
         try {
             const message = await getNonce();
-            const signature = await signMessageAsync({ message });
-            const jwt = await verifySignature(address!, signature, message);
+
+            const signature = await signMessageAsync({
+                message,
+            });
+
+            const jwt = await verifySignature(
+                address,
+                signature,
+                message,
+            );
+
             localStorage.setItem("bruh_token", jwt);
+
             router.push("/dashboard");
-        } catch (err: any) {
-            setError(err.message || "Auth failed");
+        } catch (error: unknown) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : "Authentication failed. Please try again.";
+
+            setError(message);
             setLoading(false);
         }
     }
 
+    const shortenedAddress = address
+        ? `${address.slice(0, 6)}...${address.slice(-4)}`
+        : "";
+
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#eef2f5] px-6">
+        <main className="relative min-h-screen overflow-hidden bg-[#f7f6f2] px-6 py-8">
+            {/* Background */}
             <div className="pointer-events-none absolute inset-0">
+                <div className="absolute left-[-220px] top-[-100px] h-[520px] w-[520px] rounded-full bg-violet-300/15 blur-[160px]" />
+
+                <div className="absolute bottom-[-180px] right-[-200px] h-[520px] w-[520px] rounded-full bg-blue-300/15 blur-[160px]" />
+
                 <div
-                    className="absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full blur-[120px]"
+                    className="absolute inset-0 opacity-[0.025]"
                     style={{
-                        background:
-                            "radial-gradient(circle, rgba(56,189,248,0.22), transparent 68%)",
+                        backgroundImage: `
+                            linear-gradient(
+                                to right,
+                                rgba(99,102,241,0.2) 1px,
+                                transparent 1px
+                            ),
+                            linear-gradient(
+                                to bottom,
+                                rgba(99,102,241,0.2) 1px,
+                                transparent 1px
+                            )
+                        `,
+                        backgroundSize: "48px 48px",
                     }}
                 />
 
                 <motion.div
-                    className="absolute left-[18%] top-[20%] h-2 w-2 rounded-full bg-cyan-300"
-                    animate={{
-                        y: [0, -14, 0],
-                        opacity: [0.25, 0.8, 0.25],
-                    }}
+                    className="absolute left-[12%] top-[22%] h-2 w-2 rounded-full bg-violet-400"
+                    animate={
+                        reduceMotion
+                            ? undefined
+                            : {
+                                y: [0, -14, 0],
+                                opacity: [0.2, 0.75, 0.2],
+                            }
+                    }
                     transition={{
                         duration: 4,
                         repeat: Infinity,
@@ -58,11 +111,15 @@ export default function GetStarted() {
                 />
 
                 <motion.div
-                    className="absolute bottom-[22%] right-[20%] h-1.5 w-1.5 rounded-full bg-sky-400"
-                    animate={{
-                        y: [0, 12, 0],
-                        opacity: [0.2, 0.7, 0.2],
-                    }}
+                    className="absolute bottom-[18%] right-[14%] h-1.5 w-1.5 rounded-full bg-blue-400"
+                    animate={
+                        reduceMotion
+                            ? undefined
+                            : {
+                                y: [0, 12, 0],
+                                opacity: [0.2, 0.7, 0.2],
+                            }
+                    }
                     transition={{
                         duration: 5,
                         repeat: Infinity,
@@ -72,293 +129,449 @@ export default function GetStarted() {
                 />
             </div>
 
-            <div className="relative z-10 flex min-h-screen items-center justify-center py-16">
-                <motion.div
-                    initial={{ opacity: 0, y: 22, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
+            {/* Back link */}
+            <div className="relative z-10 mx-auto max-w-6xl">
+                <Link
+                    href="/"
+                    className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 transition-colors hover:text-violet-600"
+                >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    Back home
+                </Link>
+            </div>
+
+            <div className="relative z-10 mx-auto flex min-h-[calc(100vh-80px)] max-w-6xl items-center justify-center py-10">
+                <motion.section
+                    initial={
+                        reduceMotion
+                            ? { opacity: 1 }
+                            : {
+                                opacity: 0,
+                                y: 24,
+                                scale: 0.98,
+                            }
+                    }
+                    animate={{
+                        opacity: 1,
+                        y: 0,
+                        scale: 1,
+                    }}
                     transition={{
                         duration: 0.55,
                         ease: [0.22, 1, 0.36, 1],
                     }}
-                    className="relative w-full max-w-[440px] overflow-hidden rounded-[28px] border bg-white/90 p-8 backdrop-blur-xl sm:p-10"
-                    style={{
-                        borderColor: "rgba(56,189,248,0.22)",
-                        boxShadow:
-                            "0 30px 80px -32px rgba(14,165,233,0.34), 0 18px 45px -28px rgba(15,23,42,0.25), inset 0 0 0 1px rgba(255,255,255,0.8)",
-                    }}
+                    className="grid w-full max-w-5xl overflow-hidden rounded-[32px] border border-violet-200/70 bg-[#fffdf8]/90 shadow-[0_35px_90px_-55px_rgba(79,70,229,0.55)] backdrop-blur-xl lg:grid-cols-[1.08fr_0.92fr]"
                 >
+                    {/* Left side */}
                     <div
-                        className="absolute left-1/2 top-0 h-px w-3/4 -translate-x-1/2"
+                        className="relative overflow-hidden border-b border-black/10 px-7 py-10 sm:px-10 sm:py-14 lg:border-b-0 lg:border-r"
                         style={{
-                            background:
-                                "linear-gradient(90deg, transparent, #38BDF8, #6EE7FF, transparent)",
+                            background: `
+                                radial-gradient(
+                                    circle at 15% 10%,
+                                    rgba(139,92,246,0.13),
+                                    transparent 35%
+                                ),
+                                radial-gradient(
+                                    circle at 85% 90%,
+                                    rgba(59,130,246,0.11),
+                                    transparent 38%
+                                ),
+                                linear-gradient(
+                                    145deg,
+                                    #fffdf8,
+                                    #f8f3eb
+                                )
+                            `,
                         }}
-                    />
-
-                    <div className="flex flex-col items-center text-center">
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.8, rotate: -6 }}
-                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                            transition={{
-                                delay: 0.12,
-                                type: "spring",
-                                stiffness: 260,
-                                damping: 20,
+                    >
+                        <div
+                            className="pointer-events-none absolute inset-0 opacity-[0.026] mix-blend-multiply"
+                            style={{
+                                backgroundImage:
+                                    "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='.9'/%3E%3C/svg%3E\")",
                             }}
-                            className="relative mb-7"
-                        >
-                            <motion.div
-                                className="absolute inset-0 rounded-2xl blur-xl"
+                        />
+
+                        <div className="relative">
+                            <div className="inline-flex rounded-full bg-gradient-to-r from-violet-500 to-blue-500 p-px">
+                                <div className="flex items-center gap-2 rounded-full bg-[#fbf8f2] px-4 py-2">
+                                    <Sparkles className="h-3.5 w-3.5 text-violet-600" />
+
+                                    <span className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-600">
+                                        Secure wallet access
+                                    </span>
+                                </div>
+                            </div>
+
+                            <h1
+                                className="mt-7 max-w-lg text-[42px] font-black uppercase leading-[0.92] tracking-[-0.055em] text-slate-950 sm:text-[56px]"
                                 style={{
-                                    background:
-                                        "linear-gradient(135deg, rgba(56,189,248,0.55), rgba(110,231,255,0.4))",
+                                    fontFamily: "var(--font-display)",
                                 }}
-                                animate={{
-                                    scale: [0.9, 1.15, 0.9],
-                                    opacity: [0.25, 0.5, 0.25],
-                                }}
-                                transition={{
-                                    duration: 3,
-                                    repeat: Infinity,
-                                    ease: "easeInOut",
-                                }}
-                            />
+                            >
+                                Enter the{" "}
+                                <span className="bg-gradient-to-r from-violet-600 to-blue-500 bg-clip-text text-transparent">
+                                    agent economy.
+                                </span>
+                            </h1>
 
-                            <div className="relative flex h-20 w-20 items-center justify-center overflow-hidden">
-                                <motion.div
-                                    className="absolute h-12 w-12 rounded-full blur-[7px]"
-                                    style={{
-                                        background:
-                                            "conic-gradient(from 0deg, #22D3EE, #3B82F6, #A855F7, #EC4899, #22D3EE)",
-                                    }}
-                                    animate={{
-                                        rotate: 360,
-                                        scale: [0.92, 1.08, 0.92],
-                                    }}
-                                    transition={{
-                                        rotate: {
-                                            duration: 5,
-                                            repeat: Infinity,
-                                            ease: "linear",
-                                        },
-                                        scale: {
-                                            duration: 2.4,
-                                            repeat: Infinity,
-                                            ease: "easeInOut",
-                                        },
-                                    }}
+                            <p className="mt-6 max-w-lg text-[15px] font-medium leading-[1.75] text-slate-600">
+                                Connect your wallet and verify ownership
+                                with a gasless signature to access your
+                                Bruh agent dashboard.
+                            </p>
+
+                            <div className="mt-9 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                                <FeatureCard
+                                    icon={LockKeyhole}
+                                    title="No password"
+                                    description="Your wallet is your identity."
                                 />
 
-                                <motion.div
-                                    className="absolute h-10 w-10 rounded-full"
-                                    style={{
-                                        background:
-                                            "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.95), rgba(125,211,252,0.55) 30%, rgba(99,102,241,0.45) 58%, rgba(236,72,153,0.28) 78%, transparent 100%)",
-                                        boxShadow:
-                                            "inset 0 0 12px rgba(255,255,255,0.75), 0 0 18px rgba(56,189,248,0.5)",
-                                    }}
-                                    animate={{
-                                        scale: [0.94, 1.04, 0.97, 1.06, 0.94],
-                                        borderRadius: [
-                                            "48% 52% 55% 45% / 46% 48% 52% 54%",
-                                            "55% 45% 48% 52% / 52% 45% 55% 48%",
-                                            "46% 54% 45% 55% / 55% 52% 48% 45%",
-                                            "52% 48% 54% 46% / 45% 55% 46% 54%",
-                                            "48% 52% 55% 45% / 46% 48% 52% 54%",
-                                        ],
-                                    }}
-                                    transition={{
-                                        duration: 3.2,
-                                        repeat: Infinity,
-                                        ease: "easeInOut",
-                                    }}
+                                <FeatureCard
+                                    icon={ShieldCheck}
+                                    title="Non-custodial"
+                                    description="You always control your funds."
                                 />
 
-                                <motion.div
-                                    className="absolute h-7 w-7 rounded-full blur-[4px]"
-                                    style={{
-                                        background:
-                                            "linear-gradient(135deg, rgba(34,211,238,0.75), rgba(99,102,241,0.7), rgba(236,72,153,0.6))",
-                                    }}
-                                    animate={{
-                                        x: [-2, 3, -1, 2, -2],
-                                        y: [1, -2, 2, -1, 1],
-                                        scale: [0.9, 1.12, 0.96, 1.08, 0.9],
-                                    }}
-                                    transition={{
-                                        duration: 2.8,
-                                        repeat: Infinity,
-                                        ease: "easeInOut",
-                                    }}
-                                />
-
-                                <motion.div
-                                    className="absolute h-3 w-3 rounded-full bg-white/80 blur-[1px]"
-                                    animate={{
-                                        x: [-6, 5, -3, 4, -6],
-                                        y: [-5, 2, 5, -3, -5],
-                                        opacity: [0.45, 0.9, 0.55, 0.85, 0.45],
-                                    }}
-                                    transition={{
-                                        duration: 3.5,
-                                        repeat: Infinity,
-                                        ease: "easeInOut",
-                                    }}
-                                />
-
-                                <motion.div
-                                    className="absolute h-[46px] w-[46px] rounded-full border border-white/40"
-                                    animate={{
-                                        scale: [0.85, 1.15, 0.85],
-                                        opacity: [0.2, 0.55, 0.2],
-                                    }}
-                                    transition={{
-                                        duration: 2.6,
-                                        repeat: Infinity,
-                                        ease: "easeInOut",
-                                    }}
+                                <FeatureCard
+                                    icon={Zap}
+                                    title="Gasless login"
+                                    description="Signing costs no gas."
                                 />
                             </div>
-                        </motion.div>
 
-                        <motion.span
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.18 }}
-                            className="mb-3 inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600"
-                        >
-                            <span className="h-1.5 w-1.5 rounded-full bg-sky-400" />
-                            Secure wallet login
-                        </motion.span>
+                            <div className="mt-10 border-t border-black/10 pt-6">
+                                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                    Powered by
+                                </p>
 
-                        <motion.h1
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.22 }}
-                            className="text-2xl font-bold tracking-tight text-ink"
-                            style={{ fontFamily: "var(--font-display)" }}
-                        >
-                            Connect to Bruh
-                        </motion.h1>
-
-                        <motion.p
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.26 }}
-                            className="mt-3 max-w-[320px] text-sm leading-relaxed text-muted"
-                        >
-                            Connect your wallet and sign a secure message to access
-                            your autonomous agent dashboard.
-                        </motion.p>
-
-                        <motion.div
-                            initial={{ opacity: 0, y: 8 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            className="mt-7 grid w-full grid-cols-3 gap-2"
-                        >
-                            {[
-                                { label: "No password", icon: "✦" },
-                                { label: "Non-custodial", icon: "◈" },
-                                { label: "Arc ready", icon: "◎" },
-                            ].map((item) => (
-                                <div
-                                    key={item.label}
-                                    className="rounded-xl border px-2 py-3"
-                                    style={{
-                                        borderColor: "rgba(110,231,255,0.22)",
-                                        background:
-                                            "linear-gradient(135deg, rgba(56,189,248,0.05), rgba(255,255,255,0.8))",
-                                    }}
-                                >
-                                    <p className="text-sm text-sky-500">
-                                        {item.icon}
-                                    </p>
-
-                                    <p className="mt-1 text-[9px] font-semibold uppercase tracking-wider text-muted">
-                                        {item.label}
-                                    </p>
-                                </div>
-                            ))}
-                        </motion.div>
-
-                        <div className="mt-7 w-full">
-                            {!isConnected ? (
-                                <ConnectButton.Custom>
-                                    {({ openConnectModal }) => (
-                                        <motion.button
-                                            whileHover={{
-                                                scale: 1.015,
-                                                y: -2,
-                                                boxShadow:
-                                                    "0 18px 38px -16px rgba(14,165,233,0.7)",
-                                            }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={openConnectModal}
-                                            className="relative w-full overflow-hidden rounded-2xl py-4 text-sm font-semibold text-white"
-                                            style={{
-                                                background:
-                                                    "linear-gradient(135deg, #38BDF8, #0EA5E9)",
-                                                boxShadow:
-                                                    "0 14px 30px -16px rgba(14,165,233,0.7)",
-                                            }}
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                    {[
+                                        "Arc Testnet",
+                                        "Circle USDC",
+                                        "RainbowKit",
+                                        "Wallet signatures",
+                                    ].map((item) => (
+                                        <span
+                                            key={item}
+                                            className="rounded-full border border-black/10 bg-white/60 px-3 py-1.5 font-mono text-[8px] font-black uppercase tracking-[0.12em] text-slate-500"
                                         >
-                                            <motion.span
-                                                className="absolute inset-y-0 w-24 bg-white/25 blur-xl"
-                                                animate={{ x: [-120, 480] }}
-                                                transition={{
-                                                    duration: 2.8,
-                                                    repeat: Infinity,
-                                                    ease: "linear",
-                                                }}
-                                            />
+                                            {item}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                                            <span className="relative">
-                                                Connect wallet →
-                                            </span>
-                                        </motion.button>
-                                    )}
-                                </ConnectButton.Custom>
-                            ) : (
-                                <motion.button
-                                    whileTap={{ scale: 0.98 }}
-                                    onClick={handleAuth}
-                                    disabled={loading}
-                                    className="relative w-full overflow-hidden rounded-2xl py-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                    {/* Right side */}
+                    <div className="relative flex items-center px-7 py-10 sm:px-10 sm:py-14">
+                        <div className="w-full">
+                            {/* Animated icon */}
+                            <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center">
+                                <motion.div
+                                    className="absolute h-24 w-24 rounded-[30px] bg-gradient-to-br from-violet-500/25 to-blue-500/25 blur-2xl"
+                                    animate={
+                                        reduceMotion
+                                            ? undefined
+                                            : {
+                                                scale: [
+                                                    0.9,
+                                                    1.12,
+                                                    0.9,
+                                                ],
+                                                opacity: [
+                                                    0.2,
+                                                    0.48,
+                                                    0.2,
+                                                ],
+                                            }
+                                    }
+                                    transition={{
+                                        duration: 3,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
+                                    }}
+                                />
+
+                                <motion.div
+                                    className="relative flex h-20 w-20 items-center justify-center overflow-hidden rounded-[25px] border border-white/80"
                                     style={{
-                                        background:
-                                            "linear-gradient(135deg, #38BDF8, #0EA5E9)",
+                                        background: `
+                                            linear-gradient(
+                                                145deg,
+                                                rgba(255,255,255,0.9),
+                                                rgba(139,92,246,0.18)
+                                            )
+                                        `,
                                         boxShadow:
-                                            "0 14px 30px -16px rgba(14,165,233,0.7)",
+                                            "inset 0 0 0 1px rgba(255,255,255,0.7), 0 22px 40px -28px rgba(79,70,229,0.7)",
+                                    }}
+                                    animate={
+                                        reduceMotion
+                                            ? undefined
+                                            : {
+                                                y: [0, -4, 0],
+                                                rotate: [0, 2, -2, 0],
+                                            }
+                                    }
+                                    transition={{
+                                        duration: 4,
+                                        repeat: Infinity,
+                                        ease: "easeInOut",
                                     }}
                                 >
-                                    <span className="relative flex items-center justify-center gap-2">
+                                    <Wallet className="h-8 w-8 text-violet-600" />
+
+                                    <motion.div
+                                        className="absolute right-3 top-3 h-2 w-2 rounded-full bg-blue-500"
+                                        animate={
+                                            reduceMotion
+                                                ? undefined
+                                                : {
+                                                    scale: [
+                                                        0.8,
+                                                        1.35,
+                                                        0.8,
+                                                    ],
+                                                    opacity: [
+                                                        0.4,
+                                                        1,
+                                                        0.4,
+                                                    ],
+                                                }
+                                        }
+                                        transition={{
+                                            duration: 2,
+                                            repeat: Infinity,
+                                            ease: "easeInOut",
+                                        }}
+                                    />
+                                </motion.div>
+                            </div>
+
+                            <div className="text-center">
+                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-violet-600">
+                                    Step 01
+                                </p>
+
+                                <h2
+                                    className="mt-3 text-[30px] font-black uppercase tracking-[-0.04em] text-slate-950"
+                                    style={{
+                                        fontFamily:
+                                            "var(--font-display)",
+                                    }}
+                                >
+                                    {isConnected
+                                        ? "Verify your wallet"
+                                        : "Connect your wallet"}
+                                </h2>
+
+                                <p className="mx-auto mt-3 max-w-sm text-[13px] font-medium leading-[1.7] text-slate-500">
+                                    {isConnected
+                                        ? "Sign a secure message to prove ownership and continue to your dashboard."
+                                        : "Choose a supported wallet to begin. No account registration is required."}
+                                </p>
+                            </div>
+
+                            {isConnected && address && (
+                                <div className="mt-7 flex items-center justify-between rounded-[16px] border border-violet-200 bg-violet-50/70 px-4 py-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-gradient-to-br from-violet-500 to-blue-500 text-white">
+                                            <Fingerprint className="h-4 w-4" />
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[7px] font-black uppercase tracking-[0.15em] text-slate-400">
+                                                Connected wallet
+                                            </p>
+
+                                            <p className="mt-1 font-mono text-[11px] font-black text-slate-700">
+                                                {shortenedAddress}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-emerald-700">
+                                        <Check className="h-3 w-3" />
+                                        Connected
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="mt-7">
+                                {!isConnected ? (
+                                    <ConnectButton.Custom>
+                                        {({
+                                            openConnectModal,
+                                        }) => (
+                                            <motion.button
+                                                type="button"
+                                                onClick={
+                                                    openConnectModal
+                                                }
+                                                whileHover={
+                                                    reduceMotion
+                                                        ? undefined
+                                                        : {
+                                                            y: -3,
+                                                            scale: 1.01,
+                                                        }
+                                                }
+                                                whileTap={{
+                                                    scale: 0.98,
+                                                }}
+                                                className="relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-[15px] px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-white"
+                                                style={{
+                                                    background:
+                                                        "linear-gradient(135deg, #8B5CF6, #3B82F6)",
+                                                    boxShadow:
+                                                        "0 18px 36px -22px rgba(79,70,229,0.75)",
+                                                }}
+                                            >
+                                                {!reduceMotion && (
+                                                    <motion.span
+                                                        className="absolute inset-y-0 w-24 bg-white/25 blur-xl"
+                                                        animate={{
+                                                            x: [
+                                                                -140,
+                                                                520,
+                                                            ],
+                                                        }}
+                                                        transition={{
+                                                            duration: 3,
+                                                            repeat: Infinity,
+                                                            ease: "linear",
+                                                        }}
+                                                    />
+                                                )}
+
+                                                <Wallet className="relative h-4 w-4" />
+
+                                                <span className="relative">
+                                                    Connect wallet
+                                                </span>
+
+                                                <ArrowRight className="relative h-4 w-4" />
+                                            </motion.button>
+                                        )}
+                                    </ConnectButton.Custom>
+                                ) : (
+                                    <motion.button
+                                        type="button"
+                                        onClick={handleAuth}
+                                        disabled={loading}
+                                        whileHover={
+                                            loading ||
+                                                reduceMotion
+                                                ? undefined
+                                                : {
+                                                    y: -3,
+                                                    scale: 1.01,
+                                                }
+                                        }
+                                        whileTap={
+                                            loading
+                                                ? undefined
+                                                : {
+                                                    scale: 0.98,
+                                                }
+                                        }
+                                        className="flex w-full items-center justify-center gap-2 rounded-[15px] px-5 py-4 text-[11px] font-black uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                        style={{
+                                            background:
+                                                "linear-gradient(135deg, #8B5CF6, #3B82F6)",
+                                            boxShadow:
+                                                "0 18px 36px -22px rgba(79,70,229,0.75)",
+                                        }}
+                                    >
                                         {loading ? (
                                             <>
-                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                                                Authenticating…
+                                                <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/35 border-t-white" />
+                                                Waiting for signature
                                             </>
                                         ) : (
-                                            <>Sign in with wallet →</>
+                                            <>
+                                                <Fingerprint className="h-4 w-4" />
+                                                Sign in securely
+                                                <ArrowRight className="h-4 w-4" />
+                                            </>
                                         )}
-                                    </span>
-                                </motion.button>
+                                    </motion.button>
+                                )}
+                            </div>
+
+                            {error && (
+                                <motion.div
+                                    initial={{
+                                        opacity: 0,
+                                        y: 6,
+                                    }}
+                                    animate={{
+                                        opacity: 1,
+                                        y: 0,
+                                    }}
+                                    className="mt-4 rounded-[13px] border border-rose-200 bg-rose-50 px-4 py-3 text-center text-[10px] font-semibold leading-relaxed text-rose-600"
+                                >
+                                    {error}
+                                </motion.div>
                             )}
-                        </div>
 
-                        {error && (
-                            <p className="mt-4 text-xs font-medium text-red-500">
-                                {error}
+                            <div className="mt-5 flex items-center justify-center gap-2 text-[9px] font-semibold text-slate-400">
+                                <ShieldCheck className="h-3.5 w-3.5" />
+                                Signing does not create a transaction or
+                                cost gas.
+                            </div>
+
+                            <p className="mt-7 text-center text-[9px] font-medium leading-relaxed text-slate-400">
+                                By continuing, you agree to Bruh&apos;s{" "}
+                                <Link
+                                    href="#"
+                                    className="font-black text-slate-600 hover:text-violet-600"
+                                >
+                                    terms
+                                </Link>{" "}
+                                and{" "}
+                                <Link
+                                    href="#"
+                                    className="font-black text-slate-600 hover:text-violet-600"
+                                >
+                                    privacy policy
+                                </Link>
+                                .
                             </p>
-                        )}
-
-                        <p className="mt-4 text-[10px] leading-relaxed text-muted">
-                            Signing does not create a transaction or cost gas.
-                        </p>
+                        </div>
                     </div>
-                </motion.div>
+                </motion.section>
             </div>
+        </main>
+    );
+}
+
+function FeatureCard({
+    icon: Icon,
+    title,
+    description,
+}: {
+    icon: typeof LockKeyhole;
+    title: string;
+    description: string;
+}) {
+    return (
+        <div className="rounded-[16px] border border-black/10 bg-white/55 p-4 backdrop-blur-sm">
+            <div className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-violet-50 text-violet-600">
+                <Icon className="h-4 w-4" />
+            </div>
+
+            <p className="mt-4 text-[9px] font-black uppercase tracking-[0.14em] text-slate-800">
+                {title}
+            </p>
+
+            <p className="mt-2 text-[10px] font-medium leading-[1.55] text-slate-500">
+                {description}
+            </p>
         </div>
     );
-
 }

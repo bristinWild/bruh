@@ -13,25 +13,31 @@ const STRATEGIES = [
         id: "newshound",
         name: "Newshound",
         tag: "News momentum",
-        accent: "#38BDF8",
+        accent: "#8B5CF6",
+        secondary: "#6366F1",
         initial: "N",
-        description: "Aggressive. Weights recent news heavily. Trades fast on clear signals.",
+        description:
+            "Aggressive. Weights recent news heavily and trades quickly on clear signals.",
     },
     {
         id: "actuary",
         name: "Actuary",
         tag: "Base rates",
-        accent: "#6EE7FF",
+        accent: "#3B82F6",
+        secondary: "#06B6D4",
         initial: "A",
-        description: "Conservative. Anchors on historical priors. Only trades on clear mispricing.",
+        description:
+            "Conservative. Anchors on historical priors and waits for meaningful mispricing.",
     },
     {
         id: "both",
         name: "Both capabilities",
         tag: "Ensemble",
-        accent: "#0EA5E9",
+        accent: "#7C3AED",
+        secondary: "#2563EB",
         initial: "B",
-        description: "Run both reasoning styles. Disagreement is signal. Agreement is conviction.",
+        description:
+            "Runs both reasoning styles. Disagreement is signal; agreement is conviction.",
     },
 ];
 
@@ -182,140 +188,180 @@ export default function Dashboard() {
     // ── Not authenticated ─────────────────────────────────────────────────────
     if (!loading && !token) {
         return (
-            <div className="min-h-screen bg-bg flex items-center justify-center px-6">
-                <div className="text-center">
-                    <p className="text-lg font-bold text-ink" style={{ fontFamily: "var(--font-display)" }}>
-                        Not signed in
-                    </p>
-                    <p className="mt-2 text-sm text-muted">Connect your wallet to view your dashboard.</p>
+            <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#f7f6f2] px-6">
+                <div className="pointer-events-none absolute left-1/2 top-1/2 h-[520px] w-[520px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-300/20 blur-[160px]" />
 
-                    <a href="/get-started"
-                        className="mt-6 inline-block rounded-full px-6 py-3 text-sm font-semibold text-white"
-                        style={{ background: "#38BDF8" }}
+                <div className="relative w-full max-w-md rounded-[28px] border border-violet-200/70 bg-[#fffdf8]/85 p-8 text-center shadow-[0_35px_90px_-58px_rgba(79,70,229,0.55)] backdrop-blur-xl">
+                    <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-[18px] bg-gradient-to-br from-violet-500 to-blue-500 font-mono text-lg font-black text-white">
+                        B
+                    </div>
+
+                    <h1
+                        className="mt-6 text-[30px] font-black uppercase tracking-[-0.045em] text-slate-950"
+                        style={{ fontFamily: "var(--font-display)" }}
                     >
-                        Get Started →
+                        Wallet required
+                    </h1>
+
+                    <p className="mt-3 text-[13px] font-medium leading-[1.7] text-slate-500">
+                        Connect and verify your wallet before accessing your agent dashboard.
+                    </p>
+
+                    <a
+                        href="/get-started"
+                        className="mt-7 inline-flex w-full items-center justify-center rounded-[14px] bg-gradient-to-r from-violet-500 to-blue-500 px-6 py-4 text-[10px] font-black uppercase tracking-[0.14em] text-white"
+                    >
+                        Connect wallet →
                     </a>
                 </div>
-            </div >
+            </main>
         );
     }
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-bg flex items-center justify-center">
-                <p className="text-sm text-muted animate-pulse">Loading dashboard...</p>
-            </div>
+            <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2]">
+                <div className="flex items-center gap-3 rounded-full border border-violet-200 bg-[#fffdf8]/80 px-5 py-3 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500 shadow-sm">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-violet-200 border-t-violet-600" />
+                    Loading dashboard
+                </div>
+            </main>
         );
     }
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-bg px-6 py-24">
-            {/* Animated background */}
+        <main className="relative min-h-screen overflow-hidden bg-[#f7f6f2] px-6 pb-24 pt-28">
+            {/* Atmospheric background */}
             <div className="pointer-events-none absolute inset-0 overflow-hidden">
                 <motion.div
-                    className="absolute -left-40 -top-40 h-[500px] w-[500px] rounded-full opacity-30 blur-[120px]"
-                    style={{
-                        background:
-                            "radial-gradient(circle, #38BDF8, transparent 70%)",
-                    }}
-                    animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
-                    transition={{
-                        duration: 12,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                    }}
+                    className="absolute -left-56 -top-48 h-[560px] w-[560px] rounded-full bg-violet-300/15 blur-[170px]"
+                    animate={{ x: [0, 35, 0], y: [0, 24, 0] }}
+                    transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
                 />
 
                 <motion.div
-                    className="absolute -right-40 top-1/3 h-[600px] w-[600px] rounded-full opacity-20 blur-[140px]"
-                    style={{
-                        background:
-                            "radial-gradient(circle, #6EE7FF, transparent 70%)",
-                    }}
-                    animate={{ x: [0, -30, 0], y: [0, 40, 0] }}
-                    transition={{
-                        duration: 15,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 1,
-                    }}
+                    className="absolute -right-56 top-1/3 h-[620px] w-[620px] rounded-full bg-blue-300/15 blur-[180px]"
+                    animate={{ x: [0, -30, 0], y: [0, 34, 0] }}
+                    transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
                 />
 
-                <motion.div
-                    className="absolute bottom-0 left-1/4 h-[400px] w-[400px] rounded-full opacity-20 blur-[100px]"
+                <div
+                    className="absolute inset-0 opacity-[0.025]"
                     style={{
-                        background:
-                            "radial-gradient(circle, #0EA5E9, transparent 70%)",
-                    }}
-                    animate={{ x: [0, 30, 0] }}
-                    transition={{
-                        duration: 10,
-                        repeat: Infinity,
-                        ease: "easeInOut",
-                        delay: 2,
+                        backgroundImage: `
+                            linear-gradient(to right, rgba(99,102,241,0.2) 1px, transparent 1px),
+                            linear-gradient(to bottom, rgba(99,102,241,0.2) 1px, transparent 1px)
+                        `,
+                        backgroundSize: "48px 48px",
                     }}
                 />
             </div>
 
             <div className="relative z-10 mx-auto max-w-7xl">
                 {/* Header */}
-                <motion.div
+                <motion.header
                     initial={{ opacity: 0, y: -12 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mb-10"
+                    className="mb-10 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between"
                 >
-                    <span
-                        className="inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[12px] font-semibold uppercase tracking-wider text-muted"
-                        style={{ borderColor: "#6EE7FF" }}
-                    >
-                        <span
-                            className="h-1.5 w-1.5 rounded-full"
-                            style={{ background: "#38BDF8" }}
-                        />
-                        Your dashboard
-                    </span>
+                    <div>
+                        <div className="inline-flex rounded-full bg-gradient-to-r from-violet-500 to-blue-500 p-px">
+                            <div className="flex items-center gap-2 rounded-full bg-[#fbf8f2] px-4 py-2">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-40" />
+                                    <span className="relative h-2 w-2 rounded-full bg-emerald-500" />
+                                </span>
 
-                    <h1
-                        className="mt-4 text-3xl uppercase tracking-tight text-ink"
-                        style={{ fontFamily: "var(--font-display)" }}
-                    >
-                        Agent overview
-                    </h1>
-                </motion.div>
+                                <span className="font-mono text-[8px] font-black uppercase tracking-[0.2em] text-slate-600">
+                                    Agent control center
+                                </span>
+                            </div>
+                        </div>
+
+                        <h1
+                            className="mt-5 text-[46px] font-black uppercase leading-[0.92] tracking-[-0.055em] text-slate-950 sm:text-[58px]"
+                            style={{ fontFamily: "var(--font-display)" }}
+                        >
+                            Your agent{" "}
+                            <span className="bg-gradient-to-r from-violet-600 to-blue-500 bg-clip-text text-transparent">
+                                portfolio.
+                            </span>
+                        </h1>
+
+                        <p className="mt-4 max-w-xl text-[14px] font-medium leading-[1.7] text-slate-500">
+                            Create autonomous agents, inspect their reasoning, and track every prediction-market decision.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3 rounded-[22px] border border-violet-200/60 bg-[#fffdf8]/80 p-3 shadow-[0_18px_50px_-38px_rgba(79,70,229,0.45)] backdrop-blur-md">
+                        <DashboardMetric
+                            label="Agents"
+                            value={String(wallets.length)}
+                            icon="A"
+                            accent="#8B5CF6"
+                        />
+
+                        <div className="hidden h-9 w-px bg-black/10 sm:block" />
+
+                        <DashboardMetric
+                            label="Trades"
+                            value={String(
+                                trades.filter((trade) => trade.action !== "PASS")
+                                    .length,
+                            )}
+                            icon="T"
+                            accent="#3B82F6"
+                        />
+
+                        <div className="hidden h-9 w-px bg-black/10 sm:block" />
+
+                        <DashboardMetric
+                            label="Network"
+                            value="ARC"
+                            icon="N"
+                            accent="#06B6D4"
+                        />
+                    </div>
+                </motion.header>
 
                 {/* Agent selector */}
                 {wallets.length > 0 && (
-                    <div className="mb-6 flex flex-wrap items-center gap-2">
-                        {wallets.map((wallet) => (
-                            <button
-                                key={wallet.id}
-                                onClick={() => selectWallet(wallet)}
-                                className="flex items-center gap-2 rounded-full py-1.5 pl-2 pr-4 text-xs font-semibold transition-colors"
-                                style={{
-                                    background:
-                                        selected?.id === wallet.id
-                                            ? "#38BDF8"
-                                            : "var(--color-surface)",
-                                    color:
-                                        selected?.id === wallet.id
-                                            ? "white"
-                                            : "var(--color-muted)",
-                                    border: "1px solid var(--color-line)",
-                                }}
-                            >
-                                <AgentAvatar
-                                    seed={wallet.agent_name || wallet.id}
-                                    size={18}
-                                />
+                    <div className="mb-7 flex flex-wrap items-center gap-2 rounded-[20px] border border-black/10 bg-[#fffdf8]/70 p-3 backdrop-blur-md">
+                        {wallets.map((wallet) => {
+                            const active = selected?.id === wallet.id;
+                            const theme = getAgentTheme(wallet.agent_name || wallet.id);
 
-                                {wallet.agent_name || wallet.strategy}
-                            </button>
-                        ))}
+                            return (
+                                <button
+                                    key={wallet.id}
+                                    type="button"
+                                    onClick={() => selectWallet(wallet)}
+                                    className="flex items-center gap-2 rounded-full border px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition-all"
+                                    style={
+                                        active
+                                            ? {
+                                                color: "#FFFFFF",
+                                                borderColor: theme.primary,
+                                                background: `linear-gradient(135deg, ${theme.primary}, ${theme.secondary})`,
+                                                boxShadow: `0 12px 24px -18px ${theme.shadow}`,
+                                            }
+                                            : {
+                                                color: "#64748B",
+                                                borderColor: "rgba(15,23,42,0.1)",
+                                                background: "rgba(255,255,255,0.65)",
+                                            }
+                                    }
+                                >
+                                    <AgentAvatar seed={wallet.agent_name || wallet.id} size={20} />
+                                    {wallet.agent_name || wallet.strategy}
+                                </button>
+                            );
+                        })}
 
                         <button
+                            type="button"
                             onClick={startNewAgent}
-                            className="rounded-full border border-dashed px-4 py-2 text-xs font-semibold uppercase tracking-wider text-muted transition-colors"
-                            style={{ borderColor: "var(--color-line)" }}
+                            className="rounded-full border border-dashed border-violet-300 bg-violet-50/60 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-600 transition-colors hover:bg-violet-100"
                         >
                             + New agent
                         </button>
@@ -325,7 +371,7 @@ export default function Dashboard() {
                 <AnimatePresence mode="wait">
                     {/* Create agent */}
                     {(!selected || wallets.length === 0) && (
-                        <motion.div
+                        <motion.section
                             key="create-agent"
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -334,254 +380,385 @@ export default function Dashboard() {
                                 duration: 0.5,
                                 ease: [0.22, 1, 0.36, 1],
                             }}
-                            className="relative rounded-3xl border p-10 backdrop-blur-xl"
-                            style={{
-                                borderColor: "rgba(110,231,255,0.25)",
-                                background:
-                                    "linear-gradient(180deg, rgba(255,255,255,0.9), rgba(255,255,255,0.7))",
-                                boxShadow:
-                                    "0 20px 60px -15px rgba(56,189,248,0.15), 0 0 0 1px rgba(255,255,255,0.5) inset",
-                            }}
+                            className="relative overflow-hidden rounded-[30px] border border-violet-200/70 bg-[#fffdf8]/90 p-5 shadow-[0_35px_90px_-60px_rgba(79,70,229,0.55)] backdrop-blur-xl sm:p-7"
                         >
+                            <div className="pointer-events-none absolute -right-32 -top-32 h-[360px] w-[360px] rounded-full bg-violet-300/15 blur-[120px]" />
+
+                            <div className="pointer-events-none absolute -bottom-36 -left-28 h-[340px] w-[340px] rounded-full bg-blue-300/15 blur-[120px]" />
+
                             <div
-                                className="absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2"
+                                className="pointer-events-none absolute inset-0 opacity-[0.025] mix-blend-multiply"
                                 style={{
-                                    background:
-                                        "linear-gradient(90deg, transparent, #38BDF8, transparent)",
+                                    backgroundImage:
+                                        "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='.9'/%3E%3C/svg%3E\")",
                                 }}
                             />
 
-                            <div className="mb-8 text-center">
-                                <motion.span
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    transition={{ delay: 0.1 }}
-                                    className="mb-4 inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-[11px] font-semibold uppercase tracking-wider"
-                                    style={{
-                                        borderColor: "#6EE7FF",
-                                        color: "#0EA5E9",
-                                        background: "#ECFEFF",
-                                    }}
-                                >
-                                    <span
-                                        className="h-1.5 w-1.5 animate-pulse rounded-full"
-                                        style={{ background: "#38BDF8" }}
-                                    />
-                                    New agent
-                                </motion.span>
+                            <div className="relative">
+                                <div className="mb-7 flex flex-col gap-5 border-b border-black/10 pb-6 lg:flex-row lg:items-end lg:justify-between">
+                                    <div>
+                                        <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50/70 px-3 py-1.5">
+                                            <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
 
-                                <h2
-                                    className="text-2xl font-bold text-ink"
-                                    style={{ fontFamily: "var(--font-display)" }}
-                                >
-                                    Create your agentic wallet
-                                </h2>
-
-                                <p className="mt-2 text-sm text-muted">
-                                    Name it, choose its brain, deploy it on Arc.
-                                </p>
-                            </div>
-
-                            <div className="mx-auto mb-6 max-w-lg">
-                                <label className="mb-2 block text-[11px] font-semibold uppercase tracking-widest text-muted">
-                                    Agent name
-                                </label>
-
-                                <div className="flex items-center gap-3">
-                                    <motion.div
-                                        key={agentName}
-                                        initial={{ scale: 0.85, rotate: -5 }}
-                                        animate={{ scale: 1, rotate: 0 }}
-                                        transition={{
-                                            type: "spring",
-                                            stiffness: 300,
-                                            damping: 20,
-                                        }}
-                                        className="relative"
-                                    >
-                                        <div
-                                            className="absolute inset-0 rounded-2xl opacity-60 blur-md"
-                                            style={{
-                                                background:
-                                                    "linear-gradient(135deg, #38BDF8, #6EE7FF)",
-                                            }}
-                                        />
-
-                                        <div className="relative">
-                                            <AgentAvatar
-                                                seed={agentName || "preview"}
-                                                size={52}
-                                            />
+                                            <span className="text-[8px] font-black uppercase tracking-[0.18em] text-violet-600">
+                                                New agent
+                                            </span>
                                         </div>
-                                    </motion.div>
 
-                                    <input
-                                        type="text"
-                                        value={agentName}
-                                        onChange={(event) =>
-                                            setAgentName(event.target.value)
-                                        }
-                                        placeholder="e.g. Scout, Oracle, Ledger..."
-                                        maxLength={24}
-                                        className="flex-1 rounded-2xl border-2 bg-white/60 px-5 py-3.5 text-sm font-medium text-ink placeholder:font-normal placeholder:text-muted focus:outline-none"
-                                        style={{
-                                            borderColor: agentName
-                                                ? "#38BDF8"
-                                                : "rgba(215,217,220,0.6)",
-                                            boxShadow: agentName
-                                                ? "0 0 0 4px rgba(56,189,248,0.1)"
-                                                : "none",
-                                        }}
-                                    />
-                                </div>
-                            </div>
-
-                            <label className="mx-auto mb-3 block max-w-lg text-[11px] font-semibold uppercase tracking-widest text-muted">
-                                Capability
-                            </label>
-
-                            <div className="mx-auto flex max-w-lg flex-col gap-3">
-                                {STRATEGIES.map((strategy, index) => {
-                                    const isSelected =
-                                        selectedStrategy === strategy.id;
-
-                                    return (
-                                        <motion.button
-                                            key={strategy.id}
-                                            initial={{ opacity: 0, x: -12 }}
-                                            animate={{ opacity: 1, x: 0 }}
-                                            transition={{
-                                                delay: 0.15 + index * 0.06,
-                                            }}
-                                            onClick={() =>
-                                                setSelectedStrategy(strategy.id)
-                                            }
-                                            whileHover={{
-                                                y: -2,
-                                                scale: 1.005,
-                                            }}
-                                            whileTap={{ scale: 0.995 }}
-                                            className="relative flex w-full items-start gap-4 overflow-hidden rounded-2xl border-2 p-4 text-left"
+                                        <h2
+                                            className="mt-4 text-[32px] font-black uppercase leading-none tracking-[-0.045em] text-slate-950 sm:text-[38px]"
                                             style={{
-                                                borderColor: isSelected
-                                                    ? strategy.accent
-                                                    : "rgba(215,217,220,0.6)",
-                                                background: isSelected
-                                                    ? `linear-gradient(135deg, ${strategy.accent}12, ${strategy.accent}05)`
-                                                    : "rgba(255,255,255,0.5)",
-                                                boxShadow: isSelected
-                                                    ? `0 8px 24px -8px ${strategy.accent}40`
-                                                    : "none",
+                                                fontFamily: "var(--font-display)",
                                             }}
                                         >
-                                            {isSelected && (
-                                                <motion.div
-                                                    layoutId="capability-glow"
-                                                    className="absolute left-0 top-0 h-full w-1"
-                                                    style={{
-                                                        background:
-                                                            strategy.accent,
-                                                    }}
-                                                />
-                                            )}
+                                            Build your{" "}
+                                            <span className="bg-gradient-to-r from-violet-600 to-blue-500 bg-clip-text text-transparent">
+                                                agent.
+                                            </span>
+                                        </h2>
 
-                                            <div
-                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl font-mono text-sm font-bold"
-                                                style={{
-                                                    background: `${strategy.accent}18`,
-                                                    color: strategy.accent,
+                                        <p className="mt-3 max-w-xl text-[12px] font-medium leading-[1.65] text-slate-500">
+                                            Give your agent an identity, choose how it reasons,
+                                            and deploy its wallet on Arc.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 rounded-[14px] border border-black/10 bg-white/60 px-4 py-3">
+                                        <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-gradient-to-br from-violet-500 to-blue-500 font-mono text-[10px] font-black text-white">
+                                            01
+                                        </span>
+
+                                        <div>
+                                            <p className="text-[7px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                                Setup
+                                            </p>
+
+                                            <p className="mt-1 text-[10px] font-black text-slate-700">
+                                                Identity & capability
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid gap-6 lg:grid-cols-[0.82fr_1.18fr]">
+                                    {/* Identity */}
+                                    <section className="rounded-[24px] border border-black/10 bg-white/55 p-5">
+                                        <div className="flex items-start gap-4">
+                                            <motion.div
+                                                key={agentName || "preview"}
+                                                initial={{
+                                                    scale: 0.9,
+                                                    rotate: -4,
                                                 }}
+                                                animate={{
+                                                    scale: 1,
+                                                    rotate: 0,
+                                                }}
+                                                transition={{
+                                                    type: "spring",
+                                                    stiffness: 280,
+                                                    damping: 22,
+                                                }}
+                                                className="relative shrink-0"
                                             >
-                                                {strategy.initial}
-                                            </div>
+                                                <div className="absolute inset-0 rounded-[18px] bg-gradient-to-br from-violet-500 to-blue-500 opacity-30 blur-xl" />
 
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <p className="text-[15px] font-semibold text-ink">
-                                                        {strategy.name}
-                                                    </p>
-
-                                                    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted">
-                                                        {strategy.tag}
-                                                    </span>
+                                                <div className="relative overflow-hidden rounded-[18px] border-4 border-white shadow-lg">
+                                                    <AgentAvatar
+                                                        seed={agentName || "preview"}
+                                                        size={64}
+                                                    />
                                                 </div>
+                                            </motion.div>
 
-                                                <p className="mt-1 text-[13px] leading-snug text-muted">
-                                                    {strategy.description}
+                                            <div className="min-w-0">
+                                                <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                                    Agent identity
+                                                </p>
+
+                                                <h3 className="mt-2 text-[18px] font-black tracking-[-0.03em] text-slate-900">
+                                                    {agentName.trim() || "Unnamed agent"}
+                                                </h3>
+
+                                                <p className="mt-2 text-[10px] font-medium leading-[1.55] text-slate-500">
+                                                    This name appears on reasoning feeds,
+                                                    transactions, and agent activity.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-6">
+                                            <label className="mb-2 block text-[8px] font-black uppercase tracking-[0.17em] text-slate-400">
+                                                Agent name
+                                            </label>
+
+                                            <input
+                                                type="text"
+                                                value={agentName}
+                                                onChange={(event) =>
+                                                    setAgentName(event.target.value)
+                                                }
+                                                placeholder="Scout, Oracle, Ledger..."
+                                                maxLength={24}
+                                                className="h-14 w-full rounded-[15px] border bg-white/80 px-4 text-[13px] font-bold text-slate-900 outline-none transition-all placeholder:font-medium placeholder:text-slate-400"
+                                                style={{
+                                                    borderColor: agentName
+                                                        ? "rgba(139,92,246,0.45)"
+                                                        : "rgba(15,23,42,0.1)",
+                                                    boxShadow: agentName
+                                                        ? "0 0 0 4px rgba(139,92,246,0.08)"
+                                                        : "none",
+                                                }}
+                                            />
+
+                                            <div className="mt-2 flex items-center justify-between">
+                                                <p className="text-[8px] font-medium text-slate-400">
+                                                    Keep it short and memorable.
+                                                </p>
+
+                                                <p className="font-mono text-[8px] font-black text-slate-400">
+                                                    {agentName.length}/24
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="mt-5 grid grid-cols-2 gap-2">
+                                            <div className="rounded-[13px] border border-black/10 bg-[#fffdf8]/70 p-3">
+                                                <p className="text-[7px] font-black uppercase tracking-[0.15em] text-slate-400">
+                                                    Network
+                                                </p>
+
+                                                <p className="mt-2 font-mono text-[10px] font-black text-slate-800">
+                                                    Arc Testnet
                                                 </p>
                                             </div>
 
-                                            <div className="shrink-0 pt-0.5">
-                                                {isSelected ? (
-                                                    <motion.div
-                                                        initial={{ scale: 0 }}
-                                                        animate={{ scale: 1 }}
-                                                        className="flex h-5 w-5 items-center justify-center rounded-full"
+                                            <div className="rounded-[13px] border border-black/10 bg-[#fffdf8]/70 p-3">
+                                                <p className="text-[7px] font-black uppercase tracking-[0.15em] text-slate-400">
+                                                    Settlement
+                                                </p>
+
+                                                <p className="mt-2 font-mono text-[10px] font-black text-slate-800">
+                                                    USDC
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </section>
+
+                                    {/* Capability */}
+                                    <section className="rounded-[24px] border border-black/10 bg-white/55 p-5">
+                                        <div>
+                                            <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
+                                                Reasoning capability
+                                            </p>
+
+                                            <h3 className="mt-2 text-[18px] font-black tracking-[-0.03em] text-slate-900">
+                                                Choose how your agent thinks.
+                                            </h3>
+
+                                            <p className="mt-2 text-[10px] font-medium leading-[1.55] text-slate-500">
+                                                You can create additional agents with different
+                                                capabilities later.
+                                            </p>
+                                        </div>
+
+                                        <div className="mt-5 grid gap-3">
+                                            {STRATEGIES.map((strategy, index) => {
+                                                const isSelected =
+                                                    selectedStrategy === strategy.id;
+
+                                                return (
+                                                    <motion.button
+                                                        key={strategy.id}
+                                                        type="button"
+                                                        initial={{
+                                                            opacity: 0,
+                                                            y: 10,
+                                                        }}
+                                                        animate={{
+                                                            opacity: 1,
+                                                            y: 0,
+                                                        }}
+                                                        transition={{
+                                                            delay: 0.12 + index * 0.05,
+                                                        }}
+                                                        onClick={() =>
+                                                            setSelectedStrategy(strategy.id)
+                                                        }
+                                                        whileHover={{
+                                                            y: -3,
+                                                        }}
+                                                        whileTap={{
+                                                            scale: 0.99,
+                                                        }}
+                                                        className="relative overflow-hidden rounded-[18px] border p-4 text-left transition-all"
                                                         style={{
-                                                            background:
-                                                                strategy.accent,
+                                                            borderColor: isSelected
+                                                                ? `${strategy.accent}65`
+                                                                : "rgba(15,23,42,0.1)",
+                                                            background: isSelected
+                                                                ? `linear-gradient(
+                                                  135deg,
+                                                  ${strategy.accent}12,
+                                                  ${strategy.secondary}07
+                                              )`
+                                                                : "rgba(255,255,255,0.65)",
+                                                            boxShadow: isSelected
+                                                                ? `0 18px 38px -30px ${strategy.accent}`
+                                                                : "none",
                                                         }}
                                                     >
-                                                        <svg
-                                                            width="12"
-                                                            height="12"
-                                                            viewBox="0 0 12 12"
-                                                            fill="none"
-                                                        >
-                                                            <path
-                                                                d="M2.5 6l2.5 2.5L9.5 3.5"
-                                                                stroke="white"
-                                                                strokeWidth="1.5"
-                                                                strokeLinecap="round"
-                                                                strokeLinejoin="round"
+                                                        {isSelected && (
+                                                            <motion.div
+                                                                layoutId="capability-accent"
+                                                                className="absolute inset-y-0 left-0 w-1"
+                                                                style={{
+                                                                    background: `linear-gradient(
+                                                    180deg,
+                                                    ${strategy.accent},
+                                                    ${strategy.secondary}
+                                                )`,
+                                                                }}
                                                             />
-                                                        </svg>
-                                                    </motion.div>
-                                                ) : (
-                                                    <div
-                                                        className="h-5 w-5 rounded-full border-2"
-                                                        style={{
-                                                            borderColor:
-                                                                "var(--color-line)",
-                                                        }}
-                                                    />
-                                                )}
-                                            </div>
-                                        </motion.button>
-                                    );
-                                })}
-                            </div>
+                                                        )}
 
-                            <motion.button
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ delay: 0.4 }}
-                                whileHover={{
-                                    scale:
-                                        selectedStrategy && agentName ? 1.01 : 1,
-                                }}
-                                whileTap={{ scale: 0.99 }}
-                                onClick={handleCreateAgent}
-                                disabled={
-                                    !selectedStrategy ||
-                                    !agentName.trim() ||
-                                    creating
-                                }
-                                className="mx-auto mt-6 block w-full max-w-lg rounded-full py-3.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-30"
-                                style={{
-                                    background:
-                                        "linear-gradient(135deg, #38BDF8, #0EA5E9)",
-                                    boxShadow:
-                                        selectedStrategy && agentName
-                                            ? "0 8px 24px -6px rgba(56,189,248,0.5)"
-                                            : "none",
-                                }}
-                            >
-                                {creating
-                                    ? "Creating agent..."
-                                    : "Create agent →"}
-                            </motion.button>
-                        </motion.div>
+                                                        <div className="flex items-start gap-4">
+                                                            <div
+                                                                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px] font-mono text-[12px] font-black"
+                                                                style={{
+                                                                    color: strategy.accent,
+                                                                    background: `${strategy.accent}12`,
+                                                                    border: `1px solid ${strategy.accent}24`,
+                                                                }}
+                                                            >
+                                                                {strategy.initial}
+                                                            </div>
+
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                                                    <p className="text-[13px] font-black text-slate-900">
+                                                                        {strategy.name}
+                                                                    </p>
+
+                                                                    <span
+                                                                        className="rounded-full px-2.5 py-1 text-[7px] font-black uppercase tracking-[0.14em]"
+                                                                        style={{
+                                                                            color:
+                                                                                strategy.accent,
+                                                                            background: `${strategy.accent}10`,
+                                                                        }}
+                                                                    >
+                                                                        {strategy.tag}
+                                                                    </span>
+                                                                </div>
+
+                                                                <p className="mt-2 max-w-xl text-[10px] font-medium leading-[1.55] text-slate-500">
+                                                                    {strategy.description}
+                                                                </p>
+                                                            </div>
+
+                                                            <div
+                                                                className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border"
+                                                                style={{
+                                                                    borderColor: isSelected
+                                                                        ? strategy.accent
+                                                                        : "rgba(15,23,42,0.15)",
+                                                                    background: isSelected
+                                                                        ? strategy.accent
+                                                                        : "transparent",
+                                                                }}
+                                                            >
+                                                                {isSelected && (
+                                                                    <svg
+                                                                        width="11"
+                                                                        height="11"
+                                                                        viewBox="0 0 12 12"
+                                                                        fill="none"
+                                                                    >
+                                                                        <path
+                                                                            d="M2.5 6l2.5 2.5L9.5 3.5"
+                                                                            stroke="white"
+                                                                            strokeWidth="1.5"
+                                                                            strokeLinecap="round"
+                                                                            strokeLinejoin="round"
+                                                                        />
+                                                                    </svg>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </motion.button>
+                                                );
+                                            })}
+                                        </div>
+                                    </section>
+                                </div>
+
+                                {/* Action bar */}
+                                <div className="mt-6 flex flex-col gap-4 rounded-[20px] border border-black/10 bg-white/60 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <div
+                                            className="flex h-9 w-9 items-center justify-center rounded-[11px] font-mono text-[10px] font-black"
+                                            style={{
+                                                color: selectedStrategy
+                                                    ? "#FFFFFF"
+                                                    : "#94A3B8",
+                                                background: selectedStrategy
+                                                    ? "linear-gradient(135deg, #8B5CF6, #3B82F6)"
+                                                    : "rgba(148,163,184,0.12)",
+                                            }}
+                                        >
+                                            {selectedStrategy ? "✓" : "02"}
+                                        </div>
+
+                                        <div>
+                                            <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                                                Ready to deploy
+                                            </p>
+
+                                            <p className="mt-1 text-[10px] font-black text-slate-700">
+                                                {agentName.trim() && selectedStrategy
+                                                    ? `${agentName.trim()} is ready`
+                                                    : "Complete the agent setup"}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <motion.button
+                                        type="button"
+                                        whileHover={
+                                            selectedStrategy && agentName.trim()
+                                                ? {
+                                                    y: -2,
+                                                    scale: 1.01,
+                                                }
+                                                : undefined
+                                        }
+                                        whileTap={{
+                                            scale: 0.98,
+                                        }}
+                                        onClick={handleCreateAgent}
+                                        disabled={
+                                            !selectedStrategy ||
+                                            !agentName.trim() ||
+                                            creating
+                                        }
+                                        className="min-w-[210px] rounded-[14px] px-6 py-4 text-[10px] font-black uppercase tracking-[0.14em] text-white disabled:cursor-not-allowed disabled:opacity-30"
+                                        style={{
+                                            background:
+                                                "linear-gradient(135deg, #8B5CF6, #3B82F6)",
+                                            boxShadow:
+                                                selectedStrategy && agentName.trim()
+                                                    ? "0 18px 36px -22px rgba(79,70,229,0.75)"
+                                                    : "none",
+                                        }}
+                                    >
+                                        {creating
+                                            ? "Creating agent..."
+                                            : "Create agent →"}
+                                    </motion.button>
+                                </div>
+                            </div>
+                        </motion.section>
                     )}
 
                     {/* Existing agent */}
@@ -592,27 +769,27 @@ export default function Dashboard() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0 }}
                         >
-                            <div className="mb-6 flex items-center gap-1 border-b border-line">
+                            <div className="mb-7 flex items-center gap-1 rounded-[16px] border border-black/10 bg-[#fffdf8]/70 p-1.5 backdrop-blur-md">
                                 {TABS.map((tab) => (
                                     <button
                                         key={tab.id}
                                         onClick={() => setActiveTab(tab.id)}
-                                        className="relative px-4 py-3 text-sm font-semibold"
+                                        className="relative rounded-[11px] px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em] transition-colors"
                                         style={{
                                             color:
                                                 activeTab === tab.id
-                                                    ? "var(--color-ink)"
-                                                    : "var(--color-muted)",
+                                                    ? "#FFFFFF"
+                                                    : "#64748B",
                                         }}
                                     >
-                                        {tab.label}
+                                        <span className="relative z-10">{tab.label}</span>
 
                                         {activeTab === tab.id && (
                                             <motion.div
                                                 layoutId="tab-underline"
-                                                className="absolute bottom-0 left-0 right-0 h-0.5"
+                                                className="absolute inset-0 rounded-[11px]"
                                                 style={{
-                                                    background: "#38BDF8",
+                                                    background: "linear-gradient(135deg, #8B5CF6, #3B82F6)",
                                                 }}
                                             />
                                         )}
@@ -661,11 +838,11 @@ export default function Dashboard() {
                                                         className="aspect-square overflow-hidden rounded-2xl border p-6"
                                                         style={{
                                                             borderColor:
-                                                                "rgba(56,189,248,0.35)",
+                                                                "rgba(139,92,246,0.35)",
                                                             background:
                                                                 "linear-gradient(145deg, #071524 0%, #0A243A 55%, #0C3048 100%)",
                                                             boxShadow:
-                                                                "0 24px 60px -30px rgba(14,165,233,0.7), inset 0 0 36px rgba(56,189,248,0.08)",
+                                                                "0 24px 60px -30px rgba(79,70,229,0.7), inset 0 0 36px rgba(139,92,246,0.08)",
                                                         }}
                                                     >
                                                         <div className="flex h-full flex-col">
@@ -775,7 +952,7 @@ export default function Dashboard() {
                                                                             className="h-full w-1/3 rounded-full"
                                                                             style={{
                                                                                 background:
-                                                                                    "linear-gradient(90deg, #38BDF8, #6EE7FF)",
+                                                                                    "linear-gradient(90deg, #8B5CF6, #3B82F6)",
                                                                             }}
                                                                             animate={{
                                                                                 x: [
@@ -853,9 +1030,9 @@ export default function Dashboard() {
                                                         className="flex aspect-square flex-col overflow-hidden rounded-2xl border bg-surface"
                                                         style={{
                                                             borderColor:
-                                                                "rgba(110,231,255,0.3)",
+                                                                "rgba(139,92,246,0.25)",
                                                             boxShadow:
-                                                                "0 20px 50px -28px rgba(14,165,233,0.45), 0 0 0 1px rgba(255,255,255,0.7) inset",
+                                                                "0 20px 50px -28px rgba(79,70,229,0.45), 0 0 0 1px rgba(255,255,255,0.7) inset",
                                                         }}
                                                     >
                                                         <div className="h-20 shrink-0 overflow-hidden">
@@ -908,7 +1085,7 @@ export default function Dashboard() {
                                                                                         selected.strategy,
                                                                                 )
                                                                                     ?.accent ||
-                                                                                "#38BDF8",
+                                                                                "#8B5CF6",
                                                                         }}
                                                                     />
 
@@ -953,9 +1130,9 @@ export default function Dashboard() {
                                                                         className="overflow-hidden rounded-lg px-2 py-1.5"
                                                                         style={{
                                                                             background:
-                                                                                "linear-gradient(135deg, rgba(56,189,248,0.06), rgba(110,231,255,0.03))",
+                                                                                "linear-gradient(135deg, rgba(139,92,246,0.06), rgba(59,130,246,0.03))",
                                                                             border:
-                                                                                "1px solid rgba(110,231,255,0.2)",
+                                                                                "1px solid rgba(139,92,246,0.18)",
                                                                         }}
                                                                     >
                                                                         <p className="mb-0.5 text-[8px] uppercase tracking-wider text-muted">
@@ -992,7 +1169,7 @@ export default function Dashboard() {
                                                                         className="h-1.5 w-1.5 rounded-full"
                                                                         style={{
                                                                             background:
-                                                                                "#38BDF8",
+                                                                                "#8B5CF6",
                                                                         }}
                                                                     />
                                                                 </div>
@@ -1014,7 +1191,7 @@ export default function Dashboard() {
                                                                     rel="noreferrer"
                                                                     className="mt-1 inline-flex items-center gap-1 text-[9px] font-medium hover:opacity-70"
                                                                     style={{
-                                                                        color: "#0EA5E9",
+                                                                        color: "#7C3AED",
                                                                     }}
                                                                 >
                                                                     View on
@@ -1052,13 +1229,13 @@ export default function Dashboard() {
                 )`
                                                                 : `linear-gradient(
                     135deg,
-                    ${selectedAgentTheme?.primary ?? "#38BDF8"},
-                    ${selectedAgentTheme?.secondary ?? "#0EA5E9"}
+                    ${selectedAgentTheme?.primary ?? "#8B5CF6"},
+                    ${selectedAgentTheme?.secondary ?? "#6366F1"}
                 )`,
                                                     boxShadow:
                                                         agentState === "running"
                                                             ? "0 16px 32px -16px rgba(220,38,38,0.55)"
-                                                            : `0 16px 32px -16px ${selectedAgentTheme?.shadow ?? "rgba(14,165,233,0.6)"
+                                                            : `0 16px 32px -16px ${selectedAgentTheme?.shadow ?? "rgba(79,70,229,0.6)"
                                                             }`,
                                                 }}
                                             >
@@ -1122,10 +1299,10 @@ export default function Dashboard() {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: 8 }}
                                         transition={{ duration: 0.2 }}
-                                        className="rounded-2xl border border-line bg-surface p-8"
+                                        className="rounded-[26px] border border-black/10 bg-[#fffdf8]/75 p-6 backdrop-blur-md sm:p-8"
                                     >
                                         <div className="mb-8 grid gap-4 sm:grid-cols-3">
-                                            <div className="rounded-xl border border-line bg-bg p-4">
+                                            <div className="rounded-[18px] border border-black/10 bg-white/60 p-5">
                                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                                                     Trades executed
                                                 </p>
@@ -1141,7 +1318,7 @@ export default function Dashboard() {
                                                 </p>
                                             </div>
 
-                                            <div className="rounded-xl border border-line bg-bg p-4">
+                                            <div className="rounded-[18px] border border-black/10 bg-white/60 p-5">
                                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                                                     Avg edge
                                                 </p>
@@ -1182,7 +1359,7 @@ export default function Dashboard() {
                                                 </p>
                                             </div>
 
-                                            <div className="rounded-xl border border-line bg-bg p-4">
+                                            <div className="rounded-[18px] border border-black/10 bg-white/60 p-5">
                                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-muted">
                                                     USDC deployed
                                                 </p>
@@ -1216,11 +1393,11 @@ export default function Dashboard() {
                                         animate={{ opacity: 1, x: 0 }}
                                         exit={{ opacity: 0, x: 8 }}
                                         transition={{ duration: 0.2 }}
-                                        className="overflow-x-auto rounded-2xl border border-line bg-surface"
+                                        className="overflow-x-auto rounded-[24px] border border-black/10 bg-[#fffdf8]/80 backdrop-blur-md"
                                     >
                                         <table className="w-full min-w-[720px] text-sm">
                                             <thead>
-                                                <tr className="border-b border-line text-left">
+                                                <tr className="border-b border-black/10 bg-violet-50/40 text-left">
                                                     <th className="p-4 text-[10px] font-semibold uppercase tracking-widest text-muted">
                                                         Time
                                                     </th>
@@ -1266,7 +1443,7 @@ export default function Dashboard() {
                                                         .map((trade) => (
                                                             <tr
                                                                 key={trade.id}
-                                                                className="border-b border-line last:border-0"
+                                                                className="border-b border-black/5 transition-colors last:border-0 hover:bg-violet-50/35"
                                                             >
                                                                 <td className="p-4 font-mono text-xs text-muted">
                                                                     {new Date(
@@ -1331,6 +1508,46 @@ export default function Dashboard() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+            </div>
+        </main>
+    );
+}
+
+function DashboardMetric({
+    label,
+    value,
+    icon,
+    accent,
+}: {
+    label: string;
+    value: string;
+    icon: string;
+    accent: string;
+}) {
+    return (
+        <div className="flex min-w-[120px] flex-1 items-center gap-3 rounded-[16px] px-3 py-2 sm:flex-none">
+            <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] font-mono text-[11px] font-black text-white"
+                style={{
+                    background: `linear-gradient(
+                        135deg,
+                        ${accent},
+                        ${accent}CC
+                    )`,
+                    boxShadow: `0 12px 24px -18px ${accent}`,
+                }}
+            >
+                {icon}
+            </div>
+
+            <div>
+                <p className="text-[7px] font-black uppercase tracking-[0.17em] text-slate-400">
+                    {label}
+                </p>
+
+                <p className="mt-1 font-mono text-[15px] font-black leading-none text-slate-900">
+                    {value}
+                </p>
             </div>
         </div>
     );
