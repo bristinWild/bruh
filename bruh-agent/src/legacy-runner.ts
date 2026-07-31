@@ -1,78 +1,4 @@
 export {
-    runAgentRuntime,
-    executeAgent,
-} from "./core/runtime";
-
-export {
-    buildAgentDecision,
-} from "./core/decision";
-
-export {
-    evaluateRisk,
-} from "./core/risk";
-
-export {
-    calculatePositionSize,
-} from "./core/sizing";
-
-export type {
-    AgentAction,
-    AgentDecision,
-    AgentDifficulty,
-    AgentEstimate,
-    AgentMarket,
-    AgentProfile,
-    AgentProfileDefaults,
-    AgentProfileSource,
-    AgentProviders,
-    AgentReasoningContext,
-    AgentResearchContext,
-    AgentResearchResult,
-    AgentRuntimeConfig,
-    AgentRuntimeInput,
-    AgentRuntimeResult,
-    HistoricalProvider,
-    LlmProvider,
-    NewsProvider,
-    OnchainProvider,
-    PaidResearchProvider,
-    PaidResearchRequest,
-    PaidResearchResult,
-    PositionSizingInput,
-    PositionSizingResult,
-    ResearchEvidence,
-    RiskCheckResult,
-    RiskEvaluation,
-    ExecutionPlan,
-    ExecutionPlanSource,
-    ExecutionPlanStatus,
-    ExecutionRiskLevel,
-} from "./core/types";
-
-export {
-    newshoundProfile,
-} from "./profiles/newshound";
-
-export {
-    actuaryProfile,
-} from "./profiles/actuary";
-
-export {
-    whaleHunterProfile,
-} from "./profiles/whale-hunter";
-
-export {
-    BUILT_IN_PROFILES,
-    PROFILE_REGISTRY,
-    getAgentProfile,
-    hasAgentProfile,
-    listAgentProfiles,
-    listAgentProfileIds,
-    listProfilesByCategory,
-    listProfilesByDifficulty,
-} from "./profiles/registry";
-
-export {
     DefaultNewsProvider,
 } from "./providers/news-provider";
 
@@ -114,6 +40,27 @@ export type {
 } from "./providers/llm-provider";
 
 export {
+    InMemoryResearchCache,
+    ResearchBudgetExceededError,
+    ResearchProviderError,
+    createEmptyResearchResult,
+    createResearchCacheKey,
+    deduplicateEvidence,
+    enforceResearchBudget,
+    normalizeEvidence,
+    stableStringify,
+    withTimeout,
+} from "./providers/research-provider";
+
+export type {
+    ResearchCacheEntry,
+    ResearchProviderExecution,
+    ResearchProviderName,
+    ResearchProviderOptions,
+    ResearchProviderResponse,
+} from "./providers/research-provider";
+
+export {
     loadProviderConfig,
     ProviderConfigurationError,
 } from "./providers/config";
@@ -132,9 +79,20 @@ export {
     validateProviderFactoryReadiness,
 } from "./providers/factory";
 
+export type {
+    CreateProvidersOptions,
+    PartialProviderFactoryDependencies,
+    ProviderFactoryDependencies,
+    ProviderFactoryOverrides,
+} from "./providers/factory";
+
 export {
     AnthropicTransport,
     AnthropicTransportError,
+} from "./providers/adapters/anthropic/transport";
+
+export type {
+    AnthropicTransportOptions,
 } from "./providers/adapters/anthropic/transport";
 
 export {
@@ -142,9 +100,17 @@ export {
     TavilyNewsAdapterError,
 } from "./providers/adapters/tavily/news";
 
+export type {
+    TavilyNewsAdapterOptions,
+} from "./providers/adapters/tavily/news";
+
 export {
     SupabaseHistoricalAdapter,
     SupabaseHistoricalAdapterError,
+} from "./providers/adapters/supabase/historical";
+
+export type {
+    SupabaseHistoricalAdapterOptions,
 } from "./providers/adapters/supabase/historical";
 
 export {
@@ -152,9 +118,27 @@ export {
     DuneOnchainAdapterError,
 } from "./providers/adapters/dune/onchain";
 
+export type {
+    DuneOnchainAdapterOptions,
+} from "./providers/adapters/dune/onchain";
+
 export {
     X402ResearchAdapter,
     X402ResearchAdapterError,
+} from "./providers/adapters/x402/research";
+
+export type {
+    X402PaidFetchInput,
+    X402PaidFetchResult,
+    X402PaymentExecutor,
+    X402PaymentReceipt,
+    X402PaymentRequirement,
+    X402ResearchAdapterOptions,
+    X402ResearchReport,
+    X402ResearchRequest,
+    X402ResearchSource,
+    X402ServiceDescriptor,
+    X402ServiceDiscovery,
 } from "./providers/adapters/x402/research";
 
 export {
@@ -179,13 +163,4 @@ export type {
     CustomAgentHooks,
     DefineAgentInput,
     DefinedAgent,
-
 } from "./sdk";
-
-export {
-    buildExecutionPlan,
-} from "./core/execution-plan";
-
-export type {
-    BuildExecutionPlanInput,
-} from "./core/execution-plan";

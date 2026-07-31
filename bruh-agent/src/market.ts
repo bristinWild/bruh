@@ -70,6 +70,7 @@ export async function approveAndBuy(
 
     // Approve USDC spend
     await walletClient.writeContract({
+        chain: null,
         address: CONFIG.USDC,
         abi: USDC_ABI,
         functionName: "approve",
@@ -81,10 +82,12 @@ export async function approveAndBuy(
 
     // Buy shares
     const hash = await walletClient.writeContract({
+        chain: null,
         address: marketAddress,
         abi: MARKET_ABI,
         functionName: "buy",
         args: [isYes, usdcAmount, 0n],
+
     });
 
     return hash;
