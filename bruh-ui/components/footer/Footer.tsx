@@ -7,6 +7,7 @@ import {
 
     Sparkles,
 } from "lucide-react";
+import Image from "next/image";
 
 const FOOTER_LINKS = {
     Product: [
@@ -39,6 +40,15 @@ export default function Footer() {
                     <div className="grid gap-12 sm:grid-cols-[1.4fr_1fr_1fr_1fr]">
                         {/* Brand */}
                         <div>
+
+                            <Image
+                                src="/bruh-new-logo-wbg.png"
+                                alt="Bruh"
+                                width={840}
+                                height={744}
+                                className="h-14 w-auto"
+                                priority={false}
+                            />
 
 
                             <p className="mt-5 max-w-[260px] text-[12px] font-medium leading-[1.7] text-slate-500">

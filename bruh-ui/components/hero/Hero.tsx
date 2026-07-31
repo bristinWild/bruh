@@ -115,7 +115,7 @@ export default function Hero() {
                 <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-b from-transparent to-background" />
             </div>
 
-            <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-28 lg:grid-cols-[1.05fr_0.95fr] lg:pt-32">
+            <div className="relative mx-auto grid max-w-6xl items-center gap-14 px-6 pb-24 pt-12 lg:grid-cols-[1.05fr_0.95fr] lg:pt-32">
                 {/* Left content */}
                 <motion.div
                     initial={reduce ? "show" : "hidden"}

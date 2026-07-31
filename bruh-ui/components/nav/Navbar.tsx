@@ -25,27 +25,8 @@ const NAV_LINKS = [
 
 export default function Navbar() {
     const reduceMotion = useReducedMotion();
-    const { scrollY } = useScroll();
 
     const [mobileOpen, setMobileOpen] = useState(false);
-
-    const backgroundOpacity = useTransform(
-        scrollY,
-        [0, 50],
-        [0, 1],
-    );
-
-    const borderOpacity = useTransform(
-        scrollY,
-        [0, 50],
-        [0, 1],
-    );
-
-    const navScale = useTransform(
-        scrollY,
-        [0, 80],
-        [1, 0.985],
-    );
 
     return (
         <motion.header
@@ -62,29 +43,12 @@ export default function Navbar() {
                 duration: 0.45,
                 ease: [0.22, 1, 0.36, 1],
             }}
-            className="fixed inset-x-0 top-0 z-50"
+            className="relative z-50"
         >
             {/* Scrolled background */}
-            <motion.div
-                className="absolute inset-0 border-b border-transparent bg-[#fbf8f2]/88 backdrop-blur-xl"
-                style={{
-                    opacity: backgroundOpacity,
-                    borderColor:
-                        "rgba(15,23,42,0.08)",
-                }}
-            />
 
-            <motion.div
-                className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-violet-300/40 to-transparent"
-                style={{
-                    opacity: borderOpacity,
-                }}
-            />
 
             <motion.nav
-                style={{
-                    scale: navScale,
-                }}
                 className="relative mx-auto flex h-[72px] max-w-6xl items-center px-6"
             >
                 {/* Logo */}
