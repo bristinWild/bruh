@@ -12,11 +12,24 @@ export interface AgentWallet {
   status?: string;
 }
 
+export type TradeAction = "BUY_YES" | "BUY_NO" | "PASS";
+
 export interface Trade {
   id: string;
-  action: string;
+  action: TradeAction;
   timestamp: string;
-  usdc_amount?: number;
+
+  reasoning_summary?: string;
   edge?: number;
+  usdc_amount?: number;
+  probability?: number;
+  market_probability?: number;
+  market_question?: string;
+  market?: string;
   market_address?: string;
+  tx_hash?: string;
+  transaction_hash?: string;
+  research_cost?: number;
+  sources_count?: number;
+  execution_time_ms?: number;
 }

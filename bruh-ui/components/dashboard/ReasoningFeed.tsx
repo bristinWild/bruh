@@ -3,29 +3,13 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentAvatar } from "@/app/AgentAvatar";
 import { getAgentTheme } from "@/src/lib/agentTheme";
-
-type TradeAction = "BUY_YES" | "BUY_NO" | "PASS";
-
-export interface ReasoningTrade {
-    id: string;
-    action: TradeAction;
-    timestamp: string;
-    reasoning_summary?: string;
-    edge?: number;
-    usdc_amount?: number;
-    probability?: number;
-    market_probability?: number;
-    market_question?: string;
-    market?: string;
-    tx_hash?: string;
-    transaction_hash?: string;
-    research_cost?: number;
-    sources_count?: number;
-    execution_time_ms?: number;
-}
+import type {
+    Trade,
+    TradeAction,
+} from "@/components/dashboard/dashboard.types";
 
 interface ReasoningFeedProps {
-    trades: ReasoningTrade[];
+    trades: Trade[];
     agentName: string;
     agentSeed: string;
     capability?: string;
