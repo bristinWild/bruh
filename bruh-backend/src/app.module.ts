@@ -9,14 +9,13 @@ import { CircleService } from 'src/circle.service';
 import { AuthService } from 'src/auth/auth.service';
 import { JwtStrategy } from 'src/auth/jwt.strategy';
 import { WalletsService } from 'src/wallets/wallets.service';
-import { AgentsController } from 'src/agents/agents.controller';
-import { AgentsService } from 'src/agents/agents.service';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { WalletsModule } from './wallets/wallets.module';
 import { AgentsModule } from './agents/agents.module';
 import { TradesModule } from './trades/trades.module';
+import { ExecutionModule } from 'src/execution/execution.module';
 
 @Module({
   imports: [
@@ -26,15 +25,17 @@ import { TradesModule } from './trades/trades.module';
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
+    ExecutionModule,
+    AgentsModule,
   ],
-  controllers: [AuthController, WalletsController, AgentsController],
+  controllers: [AuthController, WalletsController],
   providers: [
     SupabaseService,
     CircleService,
     AuthService,
     JwtStrategy,
     WalletsService,
-    AgentsService
+
   ],
 })
 export class AppModule { }

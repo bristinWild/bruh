@@ -36,16 +36,55 @@ export async function getMyWallets(token: string): Promise<any[]> {
     return res.json();
 }
 
-export async function runAgent(token: string, walletId: string): Promise<void> {
-    await fetch(`${API_URL}/agents/${walletId}/run`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-    });
+export async function runAgent(
+    token: string,
+    walletId: string,
+    marketAddress: string,
+    autoExecute = false,
+) {
+    const res = await fetch(
+        `${API_URL}/agents/${walletId}/run`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                marketAddress,
+                autoExecute,
+            }),
+        },
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        throw new Error(
+            data?.message ||
+            `Agent run failed with status ${res.status}`,
+        );
+    }
+
+    return data;
 }
 
-export async function getTrades(token: string, walletId: string): Promise<any[]> {
-    const res = await fetch(`${API_URL}/agents/${walletId}/trades`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
+export async function getRuns(
+    token: string,
+    walletId: string,
+) {
+    const res = await fetch(
+        `${API_URL}/agents/${walletId}/runs`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+
+    if (!res.ok) {
+        throw new Error(await res.text());
+    }
+
     return res.json();
 }

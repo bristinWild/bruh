@@ -24,10 +24,12 @@ import type {
 import {
   createAgentWallet,
   getMyWallets,
-  getTrades,
   runAgent,
 } from "@/src/lib/api";
 import { getAgentTheme } from "@/src/lib/agentTheme";
+
+const DEFAULT_MARKET_ADDRESS =
+  "0x0797b5f23ded30f1a6d7cd15c54efa7781267aa0";
 
 export default function Dashboard() {
   const [token, setToken] = useState<string | null>(null);
@@ -65,24 +67,38 @@ export default function Dashboard() {
   }, [agentState]);
 
   const loadWallets = useCallback(async (jwt: string) => {
-    const response = (await getMyWallets(jwt)) as AgentWallet[];
-    const nextWallets = response || [];
+    try {
+      const response = await getMyWallets(jwt);
 
-    setWallets(nextWallets);
+      const nextWallets: AgentWallet[] = Array.isArray(response)
+        ? response
+        : [];
 
-    if (nextWallets.length > 0) {
-      setSelected((current) => {
-        const retained = current
-          ? nextWallets.find((wallet) => wallet.id === current.id)
-          : null;
-        return retained || nextWallets[0];
-      });
+      setWallets(nextWallets);
 
-      const nextTrades = await getTrades(jwt, nextWallets[0].id);
-      setTrades(nextTrades || []);
+      if (nextWallets.length > 0) {
+        setSelected((current) => {
+          const retained = current
+            ? nextWallets.find((wallet) => wallet.id === current.id)
+            : null;
+
+          return retained || nextWallets[0];
+        });
+      } else {
+        setSelected(null);
+      }
+
+      // Temporary until Phase 10 connects agent runs.
+      setTrades([]);
+    } catch (error) {
+      console.error("Failed to load agent wallets:", error);
+
+      setWallets([]);
+      setSelected(null);
+      setTrades([]);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -130,15 +146,27 @@ export default function Dashboard() {
     if (!token || !selected) return;
 
     setAgentState("running");
-    await updateStatus("active");
-    await runAgent(token, selected.id);
 
-    window.setTimeout(async () => {
-      const nextTrades = await getTrades(token, selected.id);
-      setTrades(nextTrades || []);
-      await updateStatus("paused");
+    try {
+      await updateStatus("active");
+
+      const result = await runAgent(
+        token,
+        selected.id,
+        DEFAULT_MARKET_ADDRESS,
+        false,
+      );
+
+      console.log("Agent runtime result:", result);
+
       setAgentState("done");
-    }, 8000);
+    } catch (error) {
+      console.error("Failed to run agent:", error);
+
+      setAgentState("idle");
+    } finally {
+      await updateStatus("paused");
+    }
   }
 
   async function handleStop() {
@@ -151,10 +179,8 @@ export default function Dashboard() {
     setAgentState("idle");
     setActiveTab("agent");
 
-    if (token) {
-      const nextTrades = await getTrades(token, wallet.id);
-      setTrades(nextTrades || []);
-    }
+    // Temporary until runs are integrated in Phase 10.
+    setTrades([]);
   }
 
   if (!loading && !token) {
@@ -290,9 +316,8 @@ export default function Dashboard() {
                         background:
                           agentState === "running"
                             ? "linear-gradient(135deg, #EF4444, #DC2626)"
-                            : `linear-gradient(135deg, ${
-                                selectedTheme?.primary || "#8B5CF6"
-                              }, ${selectedTheme?.secondary || "#3B82F6"})`,
+                            : `linear-gradient(135deg, ${selectedTheme?.primary || "#8B5CF6"
+                            }, ${selectedTheme?.secondary || "#3B82F6"})`,
                       }}
                     >
                       {agentState === "running"

@@ -1,6 +1,14 @@
-import { createPublicClient, createWalletClient, http, parseUnits } from "viem";
+import {
+    createPublicClient,
+    createWalletClient,
+    http
+} from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { CONFIG, MARKET_ABI, USDC_ABI } from "./config.js";
+import {
+    CONFIG,
+    MARKET_ABI,
+    USDC_ABI,
+} from "./config";
 
 const arcTestnet = {
     id: CONFIG.CHAIN_ID,
@@ -8,8 +16,7 @@ const arcTestnet = {
     nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 6 },
     rpcUrls: { default: { http: [CONFIG.RPC_URL] } },
 };
-
-export const publicClient = createPublicClient({
+const publicClient = createPublicClient({
     chain: arcTestnet as any,
     transport: http(CONFIG.RPC_URL),
 });

@@ -1,11 +1,11 @@
-import { CONFIG } from "./config.js";
+import { CONFIG } from "./config";
 import {
     getMarketState,
     getUsdcBalance,
     approveAndBuy,
     MarketState,
-} from "./market.js";
-import { reason, Reasoning } from "./reasoning.js";
+} from "./market";
+import { reason, Reasoning } from "./reasoning";
 import { privateKeyToAccount } from "viem/accounts";
 
 export interface AgentConfig {

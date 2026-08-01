@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { CONFIG } from "./config.js";
-import { MarketState } from "./market.js";
+import { CONFIG } from "./config";
+import { MarketState } from "./market";
 
 const client = new Anthropic({ apiKey: CONFIG.ANTHROPIC_API_KEY });
 

@@ -1,9 +1,40 @@
-import { Module } from '@nestjs/common';
-import { AgentsService } from './agents.service';
-import { AgentsController } from './agents.controller';
+import {
+  Module,
+} from "@nestjs/common";
+
+import {
+  ExecutionModule,
+} from "../execution/execution.module";
+
+import {
+  SupabaseService,
+} from "../supabase.service";
+
+import {
+  AgentsController,
+} from "./agents.controller";
+
+import {
+  AgentRuntimeService,
+} from "./agent-runtime.service";
 
 @Module({
-  providers: [AgentsService],
-  controllers: [AgentsController]
+  imports: [
+    ExecutionModule,
+  ],
+
+  providers: [
+    SupabaseService,
+
+    AgentRuntimeService,
+  ],
+
+  controllers: [
+    AgentsController,
+  ],
+
+  exports: [
+    AgentRuntimeService,
+  ],
 })
-export class AgentsModule {}
+export class AgentsModule { }

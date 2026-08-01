@@ -230,3 +230,6 @@ export type {
     ReflectionGenerator,
 } from "./memory";
 
+export type {
+    LlmEstimateInput,
+} from "./core/types";

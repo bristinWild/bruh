@@ -776,3 +776,12 @@ export interface RuntimeMemoryContext {
         won: boolean | null;
     }>;
 }
+
+export interface LlmEstimateInput {
+    profileId: string;
+    systemPrompt: string;
+    market: AgentMarket;
+    research: AgentResearchResult;
+    marketProbability: number;
+    instructions: string;
+}

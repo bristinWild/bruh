@@ -3,14 +3,26 @@
   "version": "1.0.0",
   "description": "Autonomous forecasting agents for Bruh prediction markets on Arc",
   "main": "dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc --noEmit",
+    "build:package": "tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "tsx src/test/runtime-smoke.ts",
     "legacy:start": "tsx src/legacy-runner.ts"
   },
-  "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@supabase/supabase-js": "^2.111.0",
