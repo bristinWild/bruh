@@ -189,3 +189,44 @@ export {
 export type {
     BuildExecutionPlanInput,
 } from "./core/execution-plan";
+
+export {
+    InMemoryAgentMemoryProvider,
+    AgentMemoryError,
+    calculateAgentPerformance,
+    createReflection,
+    createBasicReflection,
+    createPendingTradeMemory,
+    markTradeExecuting,
+    markTradeExecuted,
+    markTradeFailed,
+    markTradeRejected,
+    createResolutionMemory,
+    createAgentMemoryLifecycle,
+} from "./memory";
+
+export type {
+    AgentMemoryProvider,
+    AgentMemoryLifecycle,
+    AgentDecisionMemory,
+    AgentMemory,
+    AgentMemoryContext,
+    AgentMemoryQuery,
+    AgentMemoryRecord,
+    AgentMemoryType,
+    AgentPerformanceSummary,
+    AgentReflectionMemory,
+    AgentResolutionMemory,
+    AgentRunMemory,
+    AgentTradeMemory,
+    MarketResolution,
+    TradeExecutionStatus,
+    CreatePendingTradeMemoryInput,
+    RecordTradeExecutionInput,
+    RecordTradeFailureInput,
+    RecordMarketResolutionInput,
+    ReflectionGenerationInput,
+    ReflectionGenerationResult,
+    ReflectionGenerator,
+} from "./memory";
+

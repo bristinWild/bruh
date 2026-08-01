@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { buildAgentDecision } from "./decision";
 import { buildExecutionPlan } from "./execution-plan";
 
+
 import type {
     AgentRuntimeConfig,
     AgentRuntimeInput,
@@ -99,21 +100,114 @@ export async function runAgentRuntime(
         const config =
             mergeRuntimeConfig(input);
 
+        const memoryContext =
+            input.memoryProvider &&
+                input.agentId
+                ? await input.memoryProvider.getContext({
+                    agentId:
+                        input.agentId,
+
+                    profileId:
+                        input.profile.id,
+
+                    marketId:
+                        input.market.id,
+
+                    limit: 20,
+                })
+                : undefined;
+
+        const runtimeMemory =
+            memoryContext
+                ? {
+                    summary:
+                        memoryContext.summary,
+
+                    recentLessons:
+                        memoryContext.recentReflections.flatMap(
+                            (reflection) =>
+                                reflection.lessons,
+                        ),
+
+                    recentDecisions:
+                        memoryContext.recentDecisions.map(
+                            (decision) => ({
+                                marketId:
+                                    decision.marketId,
+
+                                action:
+                                    decision.action,
+
+                                probability:
+                                    decision.probability,
+
+                                confidence:
+                                    decision.confidence,
+
+                                edge:
+                                    decision.edge,
+
+                                reasoning:
+                                    decision.reasoning,
+                            }),
+                        ),
+
+                    recentOutcomes:
+                        memoryContext.recentResolutions.map(
+                            (resolution) => ({
+                                marketId:
+                                    resolution.marketId,
+
+                                resolution:
+                                    resolution.resolution,
+
+                                pnlUsdc:
+                                    resolution.pnlUsdc,
+
+                                won:
+                                    resolution.won,
+                            }),
+                        ),
+                }
+                : undefined;
+
         const research =
             await input.profile.research({
                 market: input.market,
+
                 config,
-                providers: input.providers,
+
+                providers:
+                    input.providers,
+
+                ...(runtimeMemory
+                    ? {
+                        memory:
+                            runtimeMemory,
+                    }
+                    : {}),
             });
 
         const estimate =
             await input.profile.estimate({
                 market: input.market,
+
                 config,
-                providers: input.providers,
+
+                providers:
+                    input.providers,
+
                 research,
+
                 marketProbability:
                     input.market.yesPrice,
+
+                ...(runtimeMemory
+                    ? {
+                        memory:
+                            runtimeMemory,
+                    }
+                    : {}),
             });
 
         const decision =
@@ -174,6 +268,108 @@ export async function runAgentRuntime(
                     }
                     : {}),
             });
+
+        /* ADD MEMORY PERSISTENCE HERE */
+        if (
+            input.memoryProvider &&
+            input.agentId
+        ) {
+            const createdAt =
+                new Date().toISOString();
+
+            await input.memoryProvider.saveMany([
+                {
+                    id: randomUUID(),
+
+                    type: "run",
+
+                    agentId:
+                        input.agentId,
+
+                    profileId:
+                        input.profile.id,
+
+                    profileVersion:
+                        input.profile.version,
+
+                    marketId:
+                        input.market.id,
+
+                    runId,
+
+                    marketQuestion:
+                        input.market.question,
+
+                    research,
+
+                    estimate,
+
+                    decision,
+
+                    executionPlan,
+
+                    createdAt,
+                },
+
+                {
+                    id: randomUUID(),
+
+                    type: "decision",
+
+                    agentId:
+                        input.agentId,
+
+                    profileId:
+                        input.profile.id,
+
+                    profileVersion:
+                        input.profile.version,
+
+                    marketId:
+                        input.market.id,
+
+                    runId,
+
+                    marketQuestion:
+                        input.market.question,
+
+                    action:
+                        decision.action,
+
+                    probability:
+                        decision.probability,
+
+                    marketProbability:
+                        decision.marketProbability,
+
+                    confidence:
+                        decision.confidence,
+
+                    edge:
+                        decision.edge,
+
+                    amountUsdc:
+                        decision.amountUsdc,
+
+                    reasoning:
+                        decision.reasoning,
+
+                    keyFactors:
+                        decision.keyFactors,
+
+                    risks:
+                        decision.risks,
+
+                    riskChecks:
+                        decision.riskChecks,
+
+                    researchCostUsdc:
+                        decision.researchCostUsdc,
+
+                    createdAt,
+                },
+            ]);
+        }
 
         const completedAt =
             new Date().toISOString();

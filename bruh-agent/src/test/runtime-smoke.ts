@@ -1,14 +1,28 @@
-import {
-    defineAgent,
-    getAgentProfile,
-    listAgentProfileIds,
-    runAgentRuntime,
-} from "../index";
+import { defineAgent, getAgentProfile, listAgentProfileIds, runAgentRuntime, } from "../index";
 
 import type {
     AgentProviders,
     AgentResearchResult,
 } from "../core/types";
+
+import {
+    InMemoryAgentMemoryProvider,
+} from "../index";
+
+import {
+    createAgentMemoryLifecycle,
+} from "../index";
+
+
+
+const memoryProvider =
+    new InMemoryAgentMemoryProvider();
+
+const memoryLifecycle =
+    createAgentMemoryLifecycle(
+        memoryProvider,
+    );
+
 
 const mockProviders: AgentProviders = {
     news: {
@@ -162,25 +176,40 @@ async function runBuiltInProfile(profileId: string) {
 
     const result = await runAgentRuntime({
         profile,
+
         market,
+
         providers: mockProviders,
+
+        memoryProvider,
+
+        agentId: `test-${profile.id}`,
+
+        walletAddress:
+            "0x1111111111111111111111111111111111111111",
+
+        network: "eip155:5042002",
+
+        executionPlanExpiresInSeconds: 300,
+
         config: {
             ...profile.defaults,
+
             availableBalanceUsdc: 100,
+
             currentMarketExposureUsdc: 0,
+
             dailyProfitLossUsdc: 0,
+
             allowTrading: true,
 
-            // No real transaction is executed by bruh-agent.
-            // This only tells us whether the resulting decision
-            // is eligible for execution.
             dryRun: true,
         },
+
         metadata: {
             test: true,
         },
     });
-
     console.log(`\n=== ${profile.name} ===`);
     console.dir(result, {
         depth: null,
@@ -208,6 +237,12 @@ async function runBuiltInProfile(profileId: string) {
     if (!result.decision) {
         throw new Error(
             `${profile.name} did not produce a decision.`,
+        );
+    }
+
+    if (!result.executionPlan) {
+        throw new Error(
+            `${profile.name} did not produce an execution plan.`,
         );
     }
 
@@ -311,6 +346,8 @@ async function runCustomAgentTest() {
 
         providers: mockProviders,
 
+        memoryProvider,
+
         agentId: "test-custom-agent",
 
         walletAddress:
@@ -332,6 +369,10 @@ async function runCustomAgentTest() {
             allowTrading: true,
 
             dryRun: true,
+        },
+
+        metadata: {
+            test: true,
         },
     });
 
@@ -357,19 +398,175 @@ async function runCustomAgentTest() {
 
 async function main() {
     console.log("Bruh Agent Runtime smoke test");
+
     console.log(
         "Registered profiles:",
         listAgentProfileIds(),
     );
 
+    let newshoundResult:
+        Awaited<
+            ReturnType<
+                typeof runBuiltInProfile
+            >
+        > | undefined;
+
     for (const profileId of listAgentProfileIds()) {
-        await runBuiltInProfile(profileId);
+        const result =
+            await runBuiltInProfile(
+                profileId,
+            );
+
+        if (
+            profileId === "newshound"
+        ) {
+            newshoundResult = result;
+        }
     }
 
     await runCustomAgentTest();
 
+    if (!newshoundResult) {
+        throw new Error(
+            "Newshound result was not captured.",
+        );
+    }
+
+    /* ----------------------------------------------------- */
+    /* Phase 7 lifecycle test */
+    /* ----------------------------------------------------- */
+
+    const pendingTrade =
+        await memoryLifecycle.createPendingTrade(
+            newshoundResult.executionPlan!,
+        );
+
     console.log(
-        "\n✅ All built-in profiles and the custom SDK agent passed.",
+        "\n=== Pending Trade ===",
+    );
+
+    console.dir(pendingTrade, {
+        depth: null,
+        colors: true,
+    });
+
+    await memoryLifecycle.markExecuting(
+        newshoundResult.executionPlan!.id,
+    );
+
+    const executedTrade =
+        await memoryLifecycle.recordExecution(
+            newshoundResult.executionPlan!.id,
+            {
+                transactionHash:
+                    "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+        );
+
+    console.log(
+        "\n=== Executed Trade ===",
+    );
+
+    console.dir(executedTrade, {
+        depth: null,
+        colors: true,
+    });
+
+    const resolved =
+        await memoryLifecycle.resolveMarket({
+            runId:
+                newshoundResult.runId,
+
+            resolution: "YES",
+        });
+
+    console.log(
+        "\n=== Resolution ===",
+    );
+
+    console.dir(
+        resolved.resolution,
+        {
+            depth: null,
+            colors: true,
+        },
+    );
+
+    console.log(
+        "\n=== Reflection ===",
+    );
+
+    console.dir(
+        resolved.reflection,
+        {
+            depth: null,
+            colors: true,
+        },
+    );
+
+    /* ----------------------------------------------------- */
+    /* Memory inspection */
+    /* ----------------------------------------------------- */
+
+    const memories =
+        await memoryProvider.find({
+            agentId: "test-newshound",
+        });
+
+    console.log(
+        "\n=== Newshound Memory ===",
+    );
+
+    console.dir(memories, {
+        depth: null,
+        colors: true,
+    });
+
+    const performance =
+        await memoryProvider.getPerformance(
+            "test-newshound",
+        );
+
+    console.log(
+        "\n=== Newshound Performance ===",
+    );
+
+    console.dir(performance, {
+        depth: null,
+        colors: true,
+    });
+
+    /* ----------------------------------------------------- */
+    /* Assertions */
+    /* ----------------------------------------------------- */
+
+    if (memories.length < 4) {
+        throw new Error(
+            "Expected run, decision, trade and resolution memories.",
+        );
+    }
+
+    if (
+        executedTrade.executionStatus !==
+        "executed"
+    ) {
+        throw new Error(
+            "Trade was not marked executed.",
+        );
+    }
+
+    if (
+        resolved.reflection
+            .outcomeAssessment !==
+        "correct"
+    ) {
+        throw new Error(
+            "Reflection was incorrect.",
+        );
+    }
+
+    console.log(
+        "\n✅ Phase 7 passed.",
     );
 }
 

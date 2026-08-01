@@ -440,6 +440,8 @@ export interface AgentResearchContext {
     config: AgentRuntimeConfig;
 
     providers: AgentProviders;
+
+    memory?: RuntimeMemoryContext;
 }
 
 export interface AgentReasoningContext {
@@ -452,6 +454,8 @@ export interface AgentReasoningContext {
     research: AgentResearchResult;
 
     marketProbability: number;
+
+    memory?: RuntimeMemoryContext;
 }
 
 export interface AgentProfile {
@@ -502,6 +506,47 @@ export interface AgentRuntimeInput {
     network?: string;
 
     executionPlanExpiresInSeconds?: number;
+
+    memoryProvider?: {
+        getContext(input: {
+            agentId: string;
+            profileId?: string;
+            marketId?: string;
+            limit?: number;
+        }): Promise<{
+            summary: string;
+
+            recentDecisions: Array<{
+                marketId: string;
+                action: AgentAction;
+                probability: number;
+                confidence: number;
+                edge: number;
+                reasoning: string;
+            }>;
+
+            recentResolutions: Array<{
+                marketId: string;
+                resolution:
+                | "YES"
+                | "NO"
+                | "INVALID"
+                | "CANCELLED";
+                pnlUsdc: number;
+                won: boolean | null;
+            }>;
+
+            recentReflections: Array<{
+                lessons: string[];
+            }>;
+        }>;
+
+        save(memory: unknown): Promise<void>;
+
+        saveMany(
+            memories: unknown[],
+        ): Promise<void>;
+    };
 
     metadata?: Record<string, unknown>;
 }
@@ -696,4 +741,38 @@ export interface ExecutionPlan {
     expiresAt: string;
 
     metadata?: Record<string, unknown>;
+}
+
+export interface RuntimeMemoryContext {
+    summary: string;
+
+    recentLessons: string[];
+
+    recentDecisions: Array<{
+        marketId: string;
+
+        action: AgentAction;
+
+        probability: number;
+
+        confidence: number;
+
+        edge: number;
+
+        reasoning: string;
+    }>;
+
+    recentOutcomes: Array<{
+        marketId: string;
+
+        resolution:
+        | "YES"
+        | "NO"
+        | "INVALID"
+        | "CANCELLED";
+
+        pnlUsdc: number;
+
+        won: boolean | null;
+    }>;
 }
