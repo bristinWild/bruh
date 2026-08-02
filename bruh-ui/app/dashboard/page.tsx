@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AgentAvatar } from "@/app/AgentAvatar";
-import ReasoningFeed from "@/components/dashboard/ReasoningFeed";
 import AgentProfileCard from "@/components/dashboard/AgentProfileCard";
 import CreateAgentPanel from "@/components/dashboard/CreateAgentPanel";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import PnlPanel from "@/components/dashboard/PnlPanel";
-import TransactionsPanel from "@/components/dashboard/TransactionsPanel";
 import WalletModal from "@/components/dashboard/WalletModal";
 import {
   RUNNING_MESSAGES,
@@ -16,20 +14,30 @@ import {
   TABS,
 } from "@/components/dashboard/dashboard.constants";
 import type {
+  AgentRun,
   AgentState,
   AgentWallet,
+  ConsensusResult,
   DashboardTab,
   Trade,
 } from "@/components/dashboard/dashboard.types";
+import { getAgentTheme } from "@/src/lib/agentTheme";
+
 import {
   createAgentWallet,
+  getAgentRuns,
   getMyWallets,
   runAgent,
 } from "@/src/lib/api";
-import { getAgentTheme } from "@/src/lib/agentTheme";
+import ConsensusOverview from "@/components/dashboard/ConsensusOverview";
+import ProfileReasoningGrid from "@/components/dashboard/ProfileReasoningGrid";
+import ExecutionPlanCard from "@/components/dashboard/ExecutionPlanCard";
+import AgentTimeline from "@/components/dashboard/AgentTimeline";
+import RunHistoryPanel from "@/components/dashboard/RunHistoryPanel";
+
 
 const DEFAULT_MARKET_ADDRESS =
-  "0x0797b5f23ded30f1a6d7cd15c54efa7781267aa0";
+  "0xcae8072e80e78ab243d42f74819b037dde623b7b";
 
 export default function Dashboard() {
   const [token, setToken] = useState<string | null>(null);
@@ -44,11 +52,31 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<DashboardTab>("agent");
   const [runningMessageIndex, setRunningMessageIndex] = useState(0);
   const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [latestRun, setLatestRun] = useState<AgentRun | null>(null);
+  const [
+    latestConsensus,
+    setLatestConsensus,
+  ] =
+    useState<ConsensusResult | null>(
+      null,
+    );
+  const [runError, setRunError] =
+    useState<string | null>(null);
+
+
 
   useEffect(() => {
-    const savedToken = localStorage.getItem("bruh_token");
-    if (savedToken) setToken(savedToken);
-    else setLoading(false);
+    const savedToken =
+      localStorage.getItem(
+        "bruh_token",
+      );
+
+    if (savedToken) {
+      setToken(savedToken);
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -59,50 +87,225 @@ export default function Dashboard() {
 
     const interval = window.setInterval(() => {
       setRunningMessageIndex(
-        (current) => (current + 1) % RUNNING_MESSAGES.length,
+        (current) =>
+          (current + 1) %
+          RUNNING_MESSAGES.length,
       );
     }, 1800);
 
-    return () => window.clearInterval(interval);
+    return () =>
+      window.clearInterval(interval);
   }, [agentState]);
 
-  const loadWallets = useCallback(async (jwt: string) => {
-    try {
-      const response = await getMyWallets(jwt);
-
-      const nextWallets: AgentWallet[] = Array.isArray(response)
-        ? response
-        : [];
-
-      setWallets(nextWallets);
-
-      if (nextWallets.length > 0) {
-        setSelected((current) => {
-          const retained = current
-            ? nextWallets.find((wallet) => wallet.id === current.id)
-            : null;
-
-          return retained || nextWallets[0];
-        });
-      } else {
-        setSelected(null);
-      }
-
-      // Temporary until Phase 10 connects agent runs.
-      setTrades([]);
-    } catch (error) {
-      console.error("Failed to load agent wallets:", error);
-
-      setWallets([]);
-      setSelected(null);
-      setTrades([]);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    if (!token || !selected) {
+      setRuns([]);
+      setLatestRun(null);
+      return;
     }
-  }, []);
+
+    let cancelled = false;
+
+    async function fetchRuns() {
+      try {
+        const nextRuns =
+          await getAgentRuns(
+            token,
+            selected.id,
+            30,
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const latestEnsemble =
+          nextRuns.find(
+            (run) =>
+              run.profile_id ===
+              "ensemble",
+          );
+
+        setLatestRun(
+          latestEnsemble ??
+          nextRuns[0] ??
+          null,
+        );
+
+        if (latestEnsemble) {
+          const memberRunIds =
+            Array.isArray(
+              latestEnsemble.metadata
+                ?.memberRunIds,
+            )
+              ? (latestEnsemble.metadata
+                ?.memberRunIds as string[])
+              : [];
+
+          setRuns(
+            memberRunIds.length > 0
+              ? nextRuns.filter(
+                (run) =>
+                  memberRunIds.includes(
+                    run.id,
+                  ) ||
+                  run.id ===
+                  latestEnsemble.id,
+              )
+              : [latestEnsemble],
+          );
+        } else {
+          setRuns(
+            nextRuns.slice(0, 1),
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Failed to load runs:",
+            error,
+          );
+
+          setRuns([]);
+          setLatestRun(null);
+        }
+      }
+    }
+
+    void fetchRuns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    token,
+    selected?.id,
+  ]);
+
+
+  const loadRuns = useCallback(
+    async (
+      jwt: string,
+      walletId: string,
+    ) => {
+      try {
+        const nextRuns =
+          await getAgentRuns(
+            jwt,
+            walletId,
+            30,
+          );
+
+        const latestEnsemble =
+          nextRuns.find(
+            (run) =>
+              run.profile_id ===
+              "ensemble",
+          );
+
+        setLatestRun(
+          latestEnsemble ??
+          nextRuns[0] ??
+          null,
+        );
+
+        if (latestEnsemble) {
+          const memberRunIds =
+            Array.isArray(
+              latestEnsemble.metadata
+                ?.memberRunIds,
+            )
+              ? (
+                latestEnsemble.metadata
+                  .memberRunIds as string[]
+              )
+              : [];
+
+          const currentRuns =
+            memberRunIds.length > 0
+              ? nextRuns.filter(
+                (run) =>
+                  memberRunIds.includes(
+                    run.id,
+                  ) ||
+                  run.id ===
+                  latestEnsemble.id,
+              )
+              : [latestEnsemble];
+
+          setRuns(currentRuns);
+        } else {
+          setRuns(
+            nextRuns.slice(0, 1),
+          );
+        }
+      } catch (error) {
+        console.error(
+          "Failed to load runs:",
+          error,
+        );
+
+        setRuns([]);
+        setLatestRun(null);
+      }
+    },
+    [],
+  );
+
+  const loadWallets = useCallback(
+    async (jwt: string) => {
+      try {
+        const response =
+          await getMyWallets(jwt);
+
+        const nextWallets:
+          AgentWallet[] =
+          Array.isArray(response)
+            ? response
+            : [];
+
+        setWallets(nextWallets);
+
+        setSelected((current) => {
+          if (
+            nextWallets.length === 0
+          ) {
+            return null;
+          }
+
+          const retained = current
+            ? nextWallets.find(
+              (wallet) =>
+                wallet.id ===
+                current.id,
+            )
+            : undefined;
+
+          return (
+            retained ??
+            nextWallets[0]
+          );
+        });
+      } catch (error) {
+        console.error(
+          "Failed to load wallets:",
+          error,
+        );
+
+        setWallets([]);
+        setSelected(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [],
+  );
+
 
   useEffect(() => {
-    if (token) void loadWallets(token);
+    if (token) {
+      void loadWallets(token);
+    }
   }, [token, loadWallets]);
 
   async function handleCreateAgent() {
@@ -143,29 +346,62 @@ export default function Dashboard() {
   }
 
   async function handleRun() {
-    if (!token || !selected) return;
+    if (!token || !selected) {
+      return;
+    }
 
     setAgentState("running");
+    setRunError(null);
+    setLatestConsensus(null);
 
     try {
-      await updateStatus("active");
-
-      const result = await runAgent(
-        token,
-        selected.id,
-        DEFAULT_MARKET_ADDRESS,
-        false,
+      await updateStatus(
+        "active",
       );
 
-      console.log("Agent runtime result:", result);
+      const response =
+        await runAgent(
+          token,
+          selected.id,
+          DEFAULT_MARKET_ADDRESS,
+          false,
+        );
+
+      setLatestConsensus(
+        response.consensus ??
+        null,
+      );
+
+      await loadRuns(
+        token,
+        selected.id,
+      );
 
       setAgentState("done");
     } catch (error) {
-      console.error("Failed to run agent:", error);
+      console.error(
+        "Failed to run agent:",
+        error,
+      );
+
+      setRunError(
+        error instanceof Error
+          ? error.message
+          : "Agent run failed.",
+      );
 
       setAgentState("idle");
     } finally {
-      await updateStatus("paused");
+      try {
+        await updateStatus(
+          "paused",
+        );
+      } catch (error) {
+        console.error(
+          "Failed to pause agent:",
+          error,
+        );
+      }
     }
   }
 
@@ -173,13 +409,16 @@ export default function Dashboard() {
     await updateStatus("paused");
     setAgentState("idle");
   }
-
-  async function selectWallet(wallet: AgentWallet) {
+  function selectWallet(
+    wallet: AgentWallet,
+  ) {
     setSelected(wallet);
     setAgentState("idle");
     setActiveTab("agent");
-
-    // Temporary until runs are integrated in Phase 10.
+    setLatestConsensus(null);
+    setRunError(null);
+    setRuns([]);
+    setLatestRun(null);
     setTrades([]);
   }
 
@@ -328,29 +567,61 @@ export default function Dashboard() {
                     </button>
                   </div>
 
-                  <ReasoningFeed
-                    trades={trades}
-                    agentName={selected.agent_name || "Unnamed agent"}
-                    agentSeed={selected.agent_name || selected.id}
-                    capability={
-                      STRATEGIES.find(
-                        (strategy) => strategy.id === selected.strategy,
-                      )?.name
-                    }
-                    capabilityAccent={
-                      STRATEGIES.find(
-                        (strategy) => strategy.id === selected.strategy,
-                      )?.accent
-                    }
-                    isRunning={agentState === "running"}
-                  />
+                  <div className="flex min-w-0 flex-col gap-5">
+                    <ConsensusOverview
+                      consensus={
+                        latestConsensus
+                      }
+                      latestRun={
+                        latestRun
+                      }
+                      error={
+                        runError
+                      }
+                    />
+
+                    <ProfileReasoningGrid
+                      runs={
+                        runs
+                      }
+                      consensus={
+                        latestConsensus
+                      }
+                    />
+
+                    <ExecutionPlanCard
+                      plan={
+                        latestConsensus
+                          ?.executionPlan ??
+                        latestRun
+                          ?.execution_plan ??
+                        null
+                      }
+                    />
+
+                    <AgentTimeline
+                      runs={
+                        runs
+                      }
+                      consensus={
+                        latestConsensus
+                      }
+                      isRunning={
+                        agentState ===
+                        "running"
+                      }
+                    />
+                  </div>
                 </div>
               )}
 
               {activeTab === "pnl" && <PnlPanel trades={trades} />}
-              {activeTab === "transactions" && (
-                <TransactionsPanel trades={trades} />
-              )}
+              {activeTab ===
+                "transactions" && (
+                  <RunHistoryPanel
+                    runs={runs}
+                  />
+                )}
             </motion.div>
           )}
         </AnimatePresence>

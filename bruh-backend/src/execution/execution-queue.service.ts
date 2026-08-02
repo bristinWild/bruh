@@ -1,451 +1,290 @@
-import {
-    Injectable,
-    Logger,
-    OnModuleInit,
-} from "@nestjs/common";
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
-import {
-    randomUUID,
-} from "node:crypto";
+import { randomUUID } from 'node:crypto';
 
-import type {
-    ExecutionPlan,
-} from "bruh-agent";
+import type { ExecutionPlan } from 'bruh-agent';
 
-import {
-    SupabaseService,
-} from "../supabase.service";
+import { SupabaseService } from '../supabase.service';
 
-import {
-    ExecutionService,
-} from "./execution.service";
+import { ExecutionService } from './execution.service';
 
 interface ExecutionJobRecord {
-    id: string;
+  id: string;
 
-    run_id: string;
+  run_id: string;
 
-    agent_wallet_id: string;
+  agent_wallet_id: string;
 
-    execution_plan_id: string;
+  execution_plan_id: string;
 
-    market_address: string;
+  market_address: string;
 
-    status: string;
+  status: string;
 
-    attempts: number;
+  attempts: number;
 }
 
 @Injectable()
-export class ExecutionQueueService
-    implements OnModuleInit {
-    private readonly logger =
-        new Logger(
-            ExecutionQueueService.name,
-        );
+export class ExecutionQueueService implements OnModuleInit {
+  private readonly logger = new Logger(ExecutionQueueService.name);
 
-    private processing = false;
+  private processing = false;
 
-    constructor(
-        private readonly supabase:
-            SupabaseService,
+  constructor(
+    private readonly supabase: SupabaseService,
 
-        private readonly execution:
-            ExecutionService,
-    ) { }
+    private readonly execution: ExecutionService,
+  ) {}
 
-    async onModuleInit() {
-        /**
-         * Resume jobs that were left pending
-         * when the server restarted.
-         */
-        setTimeout(() => {
-            void this.drain();
-        }, 1_000);
+  async onModuleInit() {
+    /**
+     * Resume jobs that were left pending
+     * when the server restarted.
+     */
+    setTimeout(() => {
+      void this.drain();
+    }, 1_000);
+  }
+
+  async enqueue(input: {
+    runId: string;
+
+    walletId: string;
+
+    marketAddress: `0x${string}`;
+
+    plan: ExecutionPlan;
+  }): Promise<{
+    jobId: string;
+    status: string;
+  }> {
+    const existing = await this.findByPlanId(input.plan.id);
+
+    if (existing) {
+      return {
+        jobId: existing.id,
+        status: existing.status,
+      };
     }
 
-    async enqueue(input: {
-        runId: string;
+    const jobId = randomUUID();
 
-        walletId: string;
+    const { error } = await this.supabase.db.from('execution_jobs').insert({
+      id: jobId,
 
-        marketAddress:
-        `0x${string}`;
+      run_id: input.runId,
 
-        plan: ExecutionPlan;
-    }): Promise<{
-        jobId: string;
-        status: string;
-    }> {
-        const existing =
-            await this.findByPlanId(
-                input.plan.id,
-            );
+      agent_wallet_id: input.walletId,
 
-        if (existing) {
-            return {
-                jobId:
-                    existing.id,
-                status:
-                    existing.status,
-            };
-        }
+      execution_plan_id: input.plan.id,
 
-        const jobId =
-            randomUUID();
+      market_address: input.marketAddress,
 
-        const {
-            error,
-        } =
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .insert({
-                    id:
-                        jobId,
+      status: 'pending',
 
-                    run_id:
-                        input.runId,
+      attempts: 0,
+    });
 
-                    agent_wallet_id:
-                        input.walletId,
-
-                    execution_plan_id:
-                        input.plan.id,
-
-                    market_address:
-                        input.marketAddress,
-
-                    status:
-                        "pending",
-
-                    attempts: 0,
-                });
-
-        if (error) {
-            throw new Error(
-                `Failed to queue execution: ${error.message}`,
-            );
-        }
-
-        await this.supabase.db
-            .from("agent_runs")
-            .update({
-                status:
-                    "execution_queued",
-
-                updated_at:
-                    new Date()
-                        .toISOString(),
-            })
-            .eq("id", input.runId);
-
-        void this.drain();
-
-        return {
-            jobId,
-            status: "pending",
-        };
+    if (error) {
+      throw new Error(`Failed to queue execution: ${error.message}`);
     }
 
-    async drain(): Promise<void> {
-        if (this.processing) {
-            return;
-        }
+    await this.supabase.db
+      .from('agent_runs')
+      .update({
+        status: 'execution_queued',
 
-        this.processing = true;
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', input.runId);
 
-        try {
-            while (true) {
-                const job =
-                    await this.claimNextJob();
+    void this.drain();
 
-                if (!job) {
-                    break;
-                }
+    return {
+      jobId,
+      status: 'pending',
+    };
+  }
 
-                await this.processJob(
-                    job,
-                );
-            }
-        } finally {
-            this.processing = false;
-        }
+  async drain(): Promise<void> {
+    if (this.processing) {
+      return;
     }
 
-    private async claimNextJob():
-        Promise<
-            ExecutionJobRecord | null
-        > {
-        const {
-            data,
-            error,
-        } =
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .select("*")
-                .eq(
-                    "status",
-                    "pending",
-                )
-                .order("created_at", {
-                    ascending: true,
-                })
-                .limit(1)
-                .maybeSingle();
+    this.processing = true;
 
-        if (error) {
-            throw new Error(
-                `Failed to read execution queue: ${error.message}`,
-            );
+    try {
+      while (true) {
+        const job = await this.claimNextJob();
+
+        if (!job) {
+          break;
         }
 
-        if (!data) {
-            return null;
-        }
+        await this.processJob(job);
+      }
+    } finally {
+      this.processing = false;
+    }
+  }
 
-        const {
-            data: claimed,
-            error:
-            claimError,
-        } =
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .update({
-                    status:
-                        "processing",
+  private async claimNextJob(): Promise<ExecutionJobRecord | null> {
+    const { data, error } = await this.supabase.db
+      .from('execution_jobs')
+      .select('*')
+      .eq('status', 'pending')
+      .order('created_at', {
+        ascending: true,
+      })
+      .limit(1)
+      .maybeSingle();
 
-                    started_at:
-                        new Date()
-                            .toISOString(),
-
-                    attempts:
-                        data.attempts +
-                        1,
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", data.id)
-                .eq(
-                    "status",
-                    "pending",
-                )
-                .select("*")
-                .maybeSingle();
-
-        if (
-            claimError ||
-            !claimed
-        ) {
-            return null;
-        }
-
-        return claimed as
-            ExecutionJobRecord;
+    if (error) {
+      throw new Error(`Failed to read execution queue: ${error.message}`);
     }
 
-    private async processJob(
-        job: ExecutionJobRecord,
-    ): Promise<void> {
-        try {
-            await this.supabase.db
-                .from("agent_runs")
-                .update({
-                    status:
-                        "executing",
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", job.run_id);
-
-            const run =
-                await this.getRun(
-                    job.run_id,
-                );
-
-            const plan =
-                run.execution_plan as
-                ExecutionPlan;
-
-            const receipt =
-                await this.execution
-                    .executePlan({
-                        plan,
-
-                        agentWalletId:
-                            job.agent_wallet_id,
-
-                        marketAddress:
-                            job.market_address as
-                            `0x${string}`,
-                    });
-
-            const successful =
-                receipt.status ===
-                "confirmed";
-
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .update({
-                    status:
-                        successful
-                            ? "completed"
-                            : "failed",
-
-                    error_message:
-                        receipt
-                            .errorMessage ??
-                        null,
-
-                    completed_at:
-                        new Date()
-                            .toISOString(),
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", job.id);
-
-            await this.supabase.db
-                .from("agent_runs")
-                .update({
-                    status:
-                        successful
-                            ? "executed"
-                            : "execution_failed",
-
-                    execution_receipt_id:
-                        receipt.id,
-
-                    error_message:
-                        receipt
-                            .errorMessage ??
-                        null,
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", job.run_id);
-        } catch (error) {
-            const message =
-                error instanceof Error
-                    ? error.message
-                    : "Unknown queue execution error.";
-
-            this.logger.error(
-                `Execution job ${job.id} failed: ${message}`,
-            );
-
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .update({
-                    status:
-                        "failed",
-
-                    error_message:
-                        message,
-
-                    completed_at:
-                        new Date()
-                            .toISOString(),
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", job.id);
-
-            await this.supabase.db
-                .from("agent_runs")
-                .update({
-                    status:
-                        "execution_failed",
-
-                    error_message:
-                        message,
-
-                    updated_at:
-                        new Date()
-                            .toISOString(),
-                })
-                .eq("id", job.run_id);
-        }
+    if (!data) {
+      return null;
     }
 
-    private async getRun(
-        runId: string,
-    ) {
-        const {
-            data,
-            error,
-        } =
-            await this.supabase.db
-                .from("agent_runs")
-                .select("*")
-                .eq("id", runId)
-                .single();
+    const { data: claimed, error: claimError } = await this.supabase.db
+      .from('execution_jobs')
+      .update({
+        status: 'processing',
 
-        if (
-            error ||
-            !data
-        ) {
-            throw new Error(
-                `Agent run ${runId} was not found.`,
-            );
-        }
+        started_at: new Date().toISOString(),
 
-        if (!data.execution_plan) {
-            throw new Error(
-                `Agent run ${runId} has no execution plan.`,
-            );
-        }
+        attempts: data.attempts + 1,
 
-        return data;
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', data.id)
+      .eq('status', 'pending')
+      .select('*')
+      .maybeSingle();
+
+    if (claimError || !claimed) {
+      return null;
     }
 
-    private async findByPlanId(
-        executionPlanId: string,
-    ): Promise<
-        ExecutionJobRecord | null
-    > {
-        const {
-            data,
-            error,
-        } =
-            await this.supabase.db
-                .from(
-                    "execution_jobs",
-                )
-                .select("*")
-                .eq(
-                    "execution_plan_id",
-                    executionPlanId,
-                )
-                .maybeSingle();
+    return claimed as ExecutionJobRecord;
+  }
 
-        if (error) {
-            throw new Error(
-                `Failed to check execution queue: ${error.message}`,
-            );
-        }
+  private async processJob(job: ExecutionJobRecord): Promise<void> {
+    try {
+      await this.supabase.db
+        .from('agent_runs')
+        .update({
+          status: 'executing',
 
-        return data as
-            | ExecutionJobRecord
-            | null;
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.run_id);
+
+      const run = await this.getRun(job.run_id);
+
+      const plan = run.execution_plan as ExecutionPlan;
+
+      const receipt = await this.execution.executePlan({
+        plan,
+
+        agentWalletId: job.agent_wallet_id,
+
+        marketAddress: job.market_address as `0x${string}`,
+      });
+
+      const successful = receipt.status === 'confirmed';
+
+      await this.supabase.db
+        .from('execution_jobs')
+        .update({
+          status: successful ? 'completed' : 'failed',
+
+          error_message: receipt.errorMessage ?? null,
+
+          completed_at: new Date().toISOString(),
+
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      await this.supabase.db
+        .from('agent_runs')
+        .update({
+          status: successful ? 'executed' : 'execution_failed',
+
+          execution_receipt_id: receipt.id,
+
+          error_message: receipt.errorMessage ?? null,
+
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.run_id);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unknown queue execution error.';
+
+      this.logger.error(`Execution job ${job.id} failed: ${message}`);
+
+      await this.supabase.db
+        .from('execution_jobs')
+        .update({
+          status: 'failed',
+
+          error_message: message,
+
+          completed_at: new Date().toISOString(),
+
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id);
+
+      await this.supabase.db
+        .from('agent_runs')
+        .update({
+          status: 'execution_failed',
+
+          error_message: message,
+
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.run_id);
     }
+  }
+
+  private async getRun(runId: string) {
+    const { data, error } = await this.supabase.db
+      .from('agent_runs')
+      .select('*')
+      .eq('id', runId)
+      .single();
+
+    if (error || !data) {
+      throw new Error(`Agent run ${runId} was not found.`);
+    }
+
+    if (!data.execution_plan) {
+      throw new Error(`Agent run ${runId} has no execution plan.`);
+    }
+
+    return data;
+  }
+
+  private async findByPlanId(
+    executionPlanId: string,
+  ): Promise<ExecutionJobRecord | null> {
+    const { data, error } = await this.supabase.db
+      .from('execution_jobs')
+      .select('*')
+      .eq('execution_plan_id', executionPlanId)
+      .maybeSingle();
+
+    if (error) {
+      throw new Error(`Failed to check execution queue: ${error.message}`);
+    }
+
+    return data as ExecutionJobRecord | null;
+  }
 }

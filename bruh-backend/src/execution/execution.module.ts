@@ -1,44 +1,27 @@
-import {
-    Module,
-} from "@nestjs/common";
+import { Module } from '@nestjs/common';
 
-import {
-    CircleService,
-} from "../circle.service";
+import { CircleService } from '../circle.service';
 
-import {
-    SupabaseService,
-} from "../supabase.service";
+import { SupabaseService } from '../supabase.service';
 
-import {
-    CircleMarketExecutor,
-} from "./circle-market.executor";
+import { CircleMarketExecutor } from './circle-market.executor';
 
-import {
-    ExecutionService,
-} from "./execution.service";
+import { ExecutionService } from './execution.service';
 
-import {
-    ExecutionQueueService,
-} from "./execution-queue.service";
+import { ExecutionQueueService } from './execution-queue.service';
 
 @Module({
-    providers: [
-        CircleService,
+  providers: [
+    CircleService,
 
-        SupabaseService,
+    SupabaseService,
 
-        CircleMarketExecutor,
+    CircleMarketExecutor,
 
-        ExecutionService,
-        ExecutionQueueService,
-    ],
+    ExecutionService,
+    ExecutionQueueService,
+  ],
 
-    exports: [
-        CircleMarketExecutor,
-
-        ExecutionService,
-        ExecutionQueueService,
-    ],
+  exports: [CircleMarketExecutor, ExecutionService, ExecutionQueueService],
 })
-export class ExecutionModule { }
+export class ExecutionModule {}

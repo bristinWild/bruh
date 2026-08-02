@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { SupabaseService } from 'src/supabase.service'
+import { SupabaseService } from 'src/supabase.service';
 import { AuthController } from 'src/auth/auth.controller';
 import { WalletsController } from 'src/wallets/wallets.controller';
 import { CircleService } from 'src/circle.service';
@@ -35,7 +35,6 @@ import { ExecutionModule } from 'src/execution/execution.module';
     AuthService,
     JwtStrategy,
     WalletsService,
-
   ],
 })
-export class AppModule { }
+export class AppModule {}

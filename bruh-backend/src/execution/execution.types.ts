@@ -1,102 +1,92 @@
-import type { ExecutionPlan, } from "bruh-agent";
+import type { ExecutionPlan } from 'bruh-agent';
 
 export type ExecutionReceiptStatus =
-    | "submitted"
-    | "confirmed"
-    | "failed"
-    | "rejected"
-    | "expired";
+  'submitted' | 'confirmed' | 'failed' | 'rejected' | 'expired';
 
 export interface ExecutionReceipt {
-    id: string;
+  id: string;
 
-    executionPlanId: string;
+  executionPlanId: string;
 
-    runId: string;
+  runId: string;
 
-    agentId?: string;
+  agentId?: string;
 
-    profileId: string;
+  profileId: string;
 
-    marketId: string;
+  marketId: string;
 
-    circleWalletId: string;
+  circleWalletId: string;
 
-    walletAddress?: string;
+  walletAddress?: string;
 
-    network: string;
+  network: string;
 
-    action:
-    | "BUY_YES"
-    | "BUY_NO";
+  action: 'BUY_YES' | 'BUY_NO';
 
-    side:
-    | "YES"
-    | "NO";
+  side: 'YES' | 'NO';
 
-    amountUsdc: number;
+  amountUsdc: number;
 
-    amountAtomic: string;
+  amountAtomic: string;
 
-    approvalTransactionId?: string;
+  approvalTransactionId?: string;
 
-    approvalTransactionHash?: string;
+  approvalTransactionHash?: string;
 
-    tradeTransactionId?: string;
+  tradeTransactionId?: string;
 
-    tradeTransactionHash?: string;
+  tradeTransactionHash?: string;
 
-    status: ExecutionReceiptStatus;
+  status: ExecutionReceiptStatus;
 
-    attempts: number;
+  attempts: number;
 
-    submittedAt: string;
+  submittedAt: string;
 
-    confirmedAt?: string;
+  confirmedAt?: string;
 
-    failedAt?: string;
+  failedAt?: string;
 
-    errorCode?: string;
+  errorCode?: string;
 
-    errorMessage?: string;
+  errorMessage?: string;
 
-    metadata?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ExecutePlanInput {
-    plan: ExecutionPlan;
+  plan: ExecutionPlan;
 
-    circleWalletId: string;
+  circleWalletId: string;
 
-    marketAddress: `0x${string}`;
+  marketAddress: `0x${string}`;
 
-    usdcAddress: `0x${string}`;
+  usdcAddress: `0x${string}`;
 
-    /**
-     * USDC normally has six decimal places.
-     */
-    tokenDecimals?: number;
+  /**
+   * USDC normally has six decimal places.
+   */
+  tokenDecimals?: number;
 
-    /**
-     * Minimum market shares accepted.
-     *
-     * Use zero for the current MVP only.
-     */
-    minimumSharesOut?: bigint;
+  /**
+   * Minimum market shares accepted.
+   *
+   * Use zero for the current MVP only.
+   */
+  minimumSharesOut?: bigint;
 }
 
 export interface ExecutionAttemptContext {
-    attempt: number;
+  attempt: number;
 
-    maximumAttempts: number;
+  maximumAttempts: number;
 
-    startedAt: string;
+  startedAt: string;
 }
 
 export interface ExecutionAdapter {
-    readonly id: string;
+  readonly id: string;
 
-    execute(
-        input: ExecutePlanInput,
-    ): Promise<ExecutionReceipt>;
+  execute(input: ExecutePlanInput): Promise<ExecutionReceipt>;
 }

@@ -1,517 +1,370 @@
-import { Injectable, Logger } from "@nestjs/common";
-import { randomUUID, } from "node:crypto";
-import { CircleService, } from "../circle.service";
-import { validateExecutionPlan, } from "./execution.validator";
-import { withRetry, } from "./retry";
-import type { ExecutePlanInput, ExecutionAdapter, ExecutionReceipt, } from "./execution.types";
-
+import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { CircleService } from '../circle.service';
+import { validateExecutionPlan } from './execution.validator';
+import { withRetry } from './retry';
+import type {
+  ExecutePlanInput,
+  ExecutionAdapter,
+  ExecutionReceipt,
+} from './execution.types';
 
 @Injectable()
-export class CircleMarketExecutor
-    implements ExecutionAdapter {
-    readonly id =
-        "circle-market-executor";
+export class CircleMarketExecutor implements ExecutionAdapter {
+  readonly id = 'circle-market-executor';
 
-    private readonly logger =
-        new Logger(
-            CircleMarketExecutor.name,
-        );
+  private readonly logger = new Logger(CircleMarketExecutor.name);
 
-    constructor(
-        private readonly circle:
-            CircleService,
-    ) { }
+  constructor(private readonly circle: CircleService) {}
 
-    async execute(
-        input: ExecutePlanInput,
-    ): Promise<ExecutionReceipt> {
-        validateExecutionPlan(
-            input.plan,
-        );
+  async execute(input: ExecutePlanInput): Promise<ExecutionReceipt> {
+    validateExecutionPlan(input.plan);
 
-        if (
-            input.plan.action !== "BUY_YES" &&
-            input.plan.action !== "BUY_NO"
-        ) {
+    if (input.plan.action !== 'BUY_YES' && input.plan.action !== 'BUY_NO') {
+      throw new Error('Only BUY_YES and BUY_NO plans can be executed.');
+    }
+
+    const action: 'BUY_YES' | 'BUY_NO' = input.plan.action;
+
+    const side: 'YES' | 'NO' = action === 'BUY_YES' ? 'YES' : 'NO';
+
+    const submittedAt = new Date().toISOString();
+
+    const tokenDecimals = input.tokenDecimals ?? 6;
+
+    const amountAtomic = toAtomicUnits(input.plan.amountUsdc, tokenDecimals);
+
+    const isYes = input.plan.action === 'BUY_YES';
+
+    let approvalTransactionId: string | undefined;
+
+    let approvalTransactionHash: string | undefined;
+
+    let tradeTransactionId: string | undefined;
+
+    let attempts = 0;
+
+    try {
+      const approvalSubmission = await withRetry(
+        async (attempt) => {
+          attempts += 1;
+
+          this.logger.log(
+            `Submitting USDC approval for execution plan ${input.plan.id}; attempt ${attempt}.`,
+          );
+
+          const response = await this.circle.executeContractCall(
+            input.circleWalletId,
+
+            input.usdcAddress,
+
+            'approve(address,uint256)',
+
+            [input.marketAddress, amountAtomic],
+          );
+
+          if (!response?.id) {
             throw new Error(
-                "Only BUY_YES and BUY_NO plans can be executed.",
+              'Circle did not return an approval transaction ID.',
             );
-        }
+          }
 
-        const action:
-            "BUY_YES" | "BUY_NO" =
-            input.plan.action;
+          return response;
+        },
+        {
+          maximumAttempts: 3,
 
-            const side:
-    "YES" | "NO" =
-    action === "BUY_YES"
-        ? "YES"
-        : "NO";
+          initialDelayMs: 500,
 
-        const submittedAt =
-            new Date().toISOString();
+          maximumDelayMs: 3_000,
 
-        const tokenDecimals =
-            input.tokenDecimals ?? 6;
+          multiplier: 2,
 
-        const amountAtomic =
-            toAtomicUnits(
-                input.plan.amountUsdc,
-                tokenDecimals,
-            );
+          shouldRetry: isRetryableSubmissionError,
+        },
+      );
 
-        const isYes =
-            input.plan.action ===
-            "BUY_YES";
+      approvalTransactionId = approvalSubmission.value.id;
 
-        let approvalTransactionId:
-            | string
-            | undefined;
+      if (!approvalTransactionId) {
+        throw new Error('Approval transaction ID missing.');
+      }
 
-        let approvalTransactionHash:
-            | string
-            | undefined;
+      const approvalResult = await this.circle.waitForTransactionResult(
+        approvalTransactionId,
+      );
 
-        let tradeTransactionId:
-            | string
-            | undefined;
+      approvalTransactionHash = approvalResult.txHash;
 
-        let attempts = 0;
+      const tradeSubmission = await withRetry(
+        async (attempt) => {
+          attempts += 1;
 
-        try {
-            const approvalSubmission =
-                await withRetry(
-                    async (attempt) => {
-                        attempts += 1;
+          this.logger.log(
+            `Submitting market purchase for execution plan ${input.plan.id}; attempt ${attempt}.`,
+          );
 
-                        this.logger.log(
-                            `Submitting USDC approval for execution plan ${input.plan.id}; attempt ${attempt}.`,
-                        );
+          const response = await this.circle.executeContractCall(
+            input.circleWalletId,
 
-                        const response =
-                            await this.circle
-                                .executeContractCall(
-                                    input.circleWalletId,
+            input.marketAddress,
 
-                                    input.usdcAddress,
+            'buy(bool,uint256,uint256)',
 
-                                    "approve(address,uint256)",
+            [isYes, amountAtomic, (input.minimumSharesOut ?? 0n).toString()],
+          );
 
-                                    [
-                                        input.marketAddress,
+          if (!response?.id) {
+            throw new Error('Circle did not return a trade transaction ID.');
+          }
 
-                                        amountAtomic,
-                                    ],
-                                );
+          return response;
+        },
+        {
+          maximumAttempts: 3,
 
-                        if (!response?.id) {
-                            throw new Error(
-                                "Circle did not return an approval transaction ID.",
-                            );
-                        }
+          initialDelayMs: 500,
 
-                        return response;
-                    },
-                    {
-                        maximumAttempts: 3,
+          maximumDelayMs: 3_000,
 
-                        initialDelayMs: 500,
+          multiplier: 2,
 
-                        maximumDelayMs: 3_000,
+          shouldRetry: isRetryableSubmissionError,
+        },
+      );
 
-                        multiplier: 2,
+      tradeTransactionId = tradeSubmission.value.id;
 
-                        shouldRetry:
-                            isRetryableSubmissionError,
-                    },
-                );
+      if (!tradeTransactionId) {
+        throw new Error('Trade transaction ID missing.');
+      }
 
-            approvalTransactionId =
-                approvalSubmission.value.id;
+      const tradeResult =
+        await this.circle.waitForTransactionResult(tradeTransactionId);
 
-            if (!approvalTransactionId) {
-                throw new Error(
-                    "Approval transaction ID missing.",
-                );
+      return {
+        id: randomUUID(),
+
+        executionPlanId: input.plan.id,
+
+        runId: input.plan.runId,
+
+        ...(input.plan.agentId
+          ? {
+              agentId: input.plan.agentId,
             }
+          : {}),
 
-            const approvalResult =
-                await this.circle.waitForTransactionResult(
-                    approvalTransactionId,
-                );
+        profileId: input.plan.profileId,
 
-            approvalTransactionHash =
-                approvalResult.txHash;
+        marketId: input.plan.marketId,
 
-            const tradeSubmission =
-                await withRetry(
-                    async (attempt) => {
-                        attempts += 1;
+        circleWalletId: input.circleWalletId,
 
-                        this.logger.log(
-                            `Submitting market purchase for execution plan ${input.plan.id}; attempt ${attempt}.`,
-                        );
-
-                        const response =
-                            await this.circle
-                                .executeContractCall(
-                                    input.circleWalletId,
-
-                                    input.marketAddress,
-
-                                    "buy(bool,uint256,uint256)",
-
-                                    [
-                                        isYes,
-
-                                        amountAtomic,
-
-                                        (
-                                            input.minimumSharesOut ??
-                                            0n
-                                        ).toString(),
-                                    ],
-                                );
-
-                        if (!response?.id) {
-                            throw new Error(
-                                "Circle did not return a trade transaction ID.",
-                            );
-                        }
-
-                        return response;
-                    },
-                    {
-                        maximumAttempts: 3,
-
-                        initialDelayMs: 500,
-
-                        maximumDelayMs: 3_000,
-
-                        multiplier: 2,
-
-                        shouldRetry:
-                            isRetryableSubmissionError,
-                    },
-                );
-
-            tradeTransactionId =
-                tradeSubmission.value.id;
-
-            if (!tradeTransactionId) {
-                throw new Error(
-                    "Trade transaction ID missing.",
-                );
+        ...(input.plan.walletAddress
+          ? {
+              walletAddress: input.plan.walletAddress,
             }
+          : {}),
 
-            const tradeResult =
-                await this.circle.waitForTransactionResult(
-                    tradeTransactionId,
-                );
+        network: input.plan.network,
 
-            return {
-                id: randomUUID(),
+        action,
 
-                executionPlanId:
-                    input.plan.id,
+        side,
 
-                runId:
-                    input.plan.runId,
+        amountUsdc: input.plan.amountUsdc,
 
-                ...(input.plan.agentId
-                    ? {
-                        agentId:
-                            input.plan
-                                .agentId,
-                    }
-                    : {}),
+        amountAtomic,
 
-                profileId:
-                    input.plan.profileId,
+        approvalTransactionId,
 
-                marketId:
-                    input.plan.marketId,
+        ...(approvalTransactionHash
+          ? {
+              approvalTransactionHash,
+            }
+          : {}),
 
-                circleWalletId:
-                    input.circleWalletId,
+        tradeTransactionId,
 
-                ...(input.plan.walletAddress
-                    ? {
-                        walletAddress:
-                            input.plan
-                                .walletAddress,
-                    }
-                    : {}),
+        ...(tradeResult.txHash
+          ? {
+              tradeTransactionHash: tradeResult.txHash,
+            }
+          : {}),
 
-                network:
-                    input.plan.network,
+        status: 'confirmed',
 
-                action,
+        attempts,
 
-               side,
+        submittedAt,
 
-                amountUsdc:
-                    input.plan.amountUsdc,
+        confirmedAt: new Date().toISOString(),
 
-                amountAtomic,
+        metadata: {
+          executor: this.id,
 
-                approvalTransactionId,
+          marketAddress: input.marketAddress,
 
-                ...(approvalTransactionHash
-                    ? {
-                        approvalTransactionHash,
-                    }
-                    : {}),
+          usdcAddress: input.usdcAddress,
+        },
+      };
+    } catch (error) {
+      this.logger.error(
+        `Execution plan ${input.plan.id} failed.`,
 
-                tradeTransactionId,
+        error instanceof Error ? error.stack : String(error),
+      );
 
-                ...(tradeResult.txHash
-                    ? {
-                        tradeTransactionHash:
-                            tradeResult
-                                .txHash,
-                    }
-                    : {}),
+      return {
+        id: randomUUID(),
 
-                status: "confirmed",
+        executionPlanId: input.plan.id,
 
-                attempts,
+        runId: input.plan.runId,
 
-                submittedAt,
+        ...(input.plan.agentId
+          ? {
+              agentId: input.plan.agentId,
+            }
+          : {}),
 
-                confirmedAt:
-                    new Date()
-                        .toISOString(),
+        profileId: input.plan.profileId,
 
-                metadata: {
-                    executor: this.id,
+        marketId: input.plan.marketId,
 
-                    marketAddress:
-                        input.marketAddress,
+        circleWalletId: input.circleWalletId,
 
-                    usdcAddress:
-                        input.usdcAddress,
-                },
-            };
-        } catch (error) {
-            this.logger.error(
-                `Execution plan ${input.plan.id} failed.`,
+        ...(input.plan.walletAddress
+          ? {
+              walletAddress: input.plan.walletAddress,
+            }
+          : {}),
 
-                error instanceof Error
-                    ? error.stack
-                    : String(error),
-            );
+        network: input.plan.network,
 
-            return {
-                id: randomUUID(),
+        action,
 
-                executionPlanId:
-                    input.plan.id,
+        side,
 
-                runId:
-                    input.plan.runId,
+        amountUsdc: input.plan.amountUsdc,
 
-                ...(input.plan.agentId
-                    ? {
-                        agentId:
-                            input.plan
-                                .agentId,
-                    }
-                    : {}),
+        amountAtomic,
 
-                profileId:
-                    input.plan.profileId,
+        ...(approvalTransactionId
+          ? {
+              approvalTransactionId,
+            }
+          : {}),
 
-                marketId:
-                    input.plan.marketId,
+        ...(approvalTransactionHash
+          ? {
+              approvalTransactionHash,
+            }
+          : {}),
 
-                circleWalletId:
-                    input.circleWalletId,
+        ...(tradeTransactionId
+          ? {
+              tradeTransactionId,
+            }
+          : {}),
 
-                ...(input.plan.walletAddress
-                    ? {
-                        walletAddress:
-                            input.plan
-                                .walletAddress,
-                    }
-                    : {}),
+        status: 'failed',
 
-                network:
-                    input.plan.network,
+        attempts,
 
-                action,
+        submittedAt,
 
-               side,
+        failedAt: new Date().toISOString(),
 
-                amountUsdc:
-                    input.plan.amountUsdc,
+        errorCode: resolveExecutionErrorCode(error),
 
-                amountAtomic,
+        errorMessage:
+          error instanceof Error ? error.message : 'Unknown execution error.',
 
-                ...(approvalTransactionId
-                    ? {
-                        approvalTransactionId,
-                    }
-                    : {}),
+        metadata: {
+          executor: this.id,
 
-                ...(approvalTransactionHash
-                    ? {
-                        approvalTransactionHash,
-                    }
-                    : {}),
+          marketAddress: input.marketAddress,
 
-                ...(tradeTransactionId
-                    ? {
-                        tradeTransactionId,
-                    }
-                    : {}),
-
-                status: "failed",
-
-                attempts,
-
-                submittedAt,
-
-                failedAt:
-                    new Date()
-                        .toISOString(),
-
-                errorCode:
-                    resolveExecutionErrorCode(
-                        error,
-                    ),
-
-                errorMessage:
-                    error instanceof Error
-                        ? error.message
-                        : "Unknown execution error.",
-
-                metadata: {
-                    executor: this.id,
-
-                    marketAddress:
-                        input.marketAddress,
-
-                    usdcAddress:
-                        input.usdcAddress,
-                },
-            };
-        }
+          usdcAddress: input.usdcAddress,
+        },
+      };
     }
+  }
 }
 
-function toAtomicUnits(
-    amount: number,
-    decimals: number,
-): string {
-    if (
-        !Number.isFinite(amount) ||
-        amount <= 0
-    ) {
-        throw new Error(
-            "USDC amount must be greater than zero.",
-        );
-    }
+function toAtomicUnits(amount: number, decimals: number): string {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error('USDC amount must be greater than zero.');
+  }
 
-    if (
-        !Number.isInteger(decimals) ||
-        decimals < 0
-    ) {
-        throw new Error(
-            "Token decimals must be a non-negative integer.",
-        );
-    }
+  if (!Number.isInteger(decimals) || decimals < 0) {
+    throw new Error('Token decimals must be a non-negative integer.');
+  }
 
-    const fixed =
-        amount.toFixed(decimals);
+  const fixed = amount.toFixed(decimals);
 
-    const [
-        whole,
-        fraction = "",
-    ] = fixed.split(".");
+  const [whole, fraction = ''] = fixed.split('.');
 
-    const atomic =
-        `${whole}${fraction.padEnd(
-            decimals,
-            "0",
-        )}`.replace(/^0+(?=\d)/, "");
+  const atomic = `${whole}${fraction.padEnd(decimals, '0')}`.replace(
+    /^0+(?=\d)/,
+    '',
+  );
 
-    return BigInt(
-        atomic || "0",
-    ).toString();
+  return BigInt(atomic || '0').toString();
 }
 
-function isRetryableSubmissionError(
-    error: unknown,
-): boolean {
-    if (!(error instanceof Error)) {
-        return false;
-    }
+function isRetryableSubmissionError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
 
-    const message =
-        error.message.toLowerCase();
+  const message = error.message.toLowerCase();
 
-    return (
-        message.includes("timeout") ||
-        message.includes("network") ||
-        message.includes("socket") ||
-        message.includes("rate") ||
-        message.includes("429") ||
-        message.includes("500") ||
-        message.includes("502") ||
-        message.includes("503") ||
-        message.includes("504")
-    );
+  return (
+    message.includes('timeout') ||
+    message.includes('network') ||
+    message.includes('socket') ||
+    message.includes('rate') ||
+    message.includes('429') ||
+    message.includes('500') ||
+    message.includes('502') ||
+    message.includes('503') ||
+    message.includes('504')
+  );
 }
 
-function resolveExecutionErrorCode(
-    error: unknown,
-): string {
-    if (!(error instanceof Error)) {
-        return "UNKNOWN_EXECUTION_ERROR";
-    }
+function resolveExecutionErrorCode(error: unknown): string {
+  if (!(error instanceof Error)) {
+    return 'UNKNOWN_EXECUTION_ERROR';
+  }
 
-    const message =
-        error.message.toLowerCase();
+  const message = error.message.toLowerCase();
 
-    if (
-        message.includes("expired")
-    ) {
-        return "EXECUTION_PLAN_EXPIRED";
-    }
+  if (message.includes('expired')) {
+    return 'EXECUTION_PLAN_EXPIRED';
+  }
 
-    if (
-        message.includes("balance")
-    ) {
-        return "INSUFFICIENT_BALANCE";
-    }
+  if (message.includes('balance')) {
+    return 'INSUFFICIENT_BALANCE';
+  }
 
-    if (
-        message.includes("approval")
-    ) {
-        return "USDC_APPROVAL_FAILED";
-    }
+  if (message.includes('approval')) {
+    return 'USDC_APPROVAL_FAILED';
+  }
 
-    if (
-        message.includes("timeout") ||
-        message.includes(
-            "did not confirm",
-        )
-    ) {
-        return "CIRCLE_TRANSACTION_TIMEOUT";
-    }
+  if (message.includes('timeout') || message.includes('did not confirm')) {
+    return 'CIRCLE_TRANSACTION_TIMEOUT';
+  }
 
-    if (
-        message.includes("denied")
-    ) {
-        return "CIRCLE_TRANSACTION_DENIED";
-    }
+  if (message.includes('denied')) {
+    return 'CIRCLE_TRANSACTION_DENIED';
+  }
 
-    if (
-        message.includes("cancelled")
-    ) {
-        return "CIRCLE_TRANSACTION_CANCELLED";
-    }
+  if (message.includes('cancelled')) {
+    return 'CIRCLE_TRANSACTION_CANCELLED';
+  }
 
-    return "CIRCLE_EXECUTION_FAILED";
+  return 'CIRCLE_EXECUTION_FAILED';
 }

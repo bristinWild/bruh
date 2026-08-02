@@ -42,7 +42,7 @@ export const RUNNING_MESSAGES = [
 export const TABS = [
   { id: "agent", label: "Agent" },
   { id: "pnl", label: "PnL" },
-  { id: "transactions", label: "Transactions" },
+  { id: "transactions", label: "History" },
 ] as const;
 
 export const ARC_TESTNET_CHAIN_ID = 5_042_002;

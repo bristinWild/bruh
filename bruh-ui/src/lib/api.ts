@@ -1,3 +1,10 @@
+
+
+import type {
+    AgentRun,
+    RunAgentResponse,
+} from "@/components/dashboard/dashboard.types";
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
 
 export async function getNonce(): Promise<string> {
@@ -36,38 +43,6 @@ export async function getMyWallets(token: string): Promise<any[]> {
     return res.json();
 }
 
-export async function runAgent(
-    token: string,
-    walletId: string,
-    marketAddress: string,
-    autoExecute = false,
-) {
-    const res = await fetch(
-        `${API_URL}/agents/${walletId}/run`,
-        {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-                marketAddress,
-                autoExecute,
-            }),
-        },
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-        throw new Error(
-            data?.message ||
-            `Agent run failed with status ${res.status}`,
-        );
-    }
-
-    return data;
-}
 
 export async function getRuns(
     token: string,
@@ -87,4 +62,89 @@ export async function getRuns(
     }
 
     return res.json();
+}
+
+export async function runAgent(
+    token: string,
+    walletId: string,
+    marketAddress: string,
+    autoExecute = false,
+): Promise<RunAgentResponse> {
+    const response = await fetch(
+        `${API_URL}/agents/${walletId}/run`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+                marketAddress,
+                autoExecute,
+            }),
+        },
+    );
+
+    return readApiResponse<RunAgentResponse>(
+        response,
+    );
+}
+
+export async function getAgentRuns(
+    token: string,
+    walletId: string,
+    limit = 30,
+): Promise<AgentRun[]> {
+    const response = await fetch(
+        `${API_URL}/agents/${walletId}/runs?limit=${limit}`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+
+    const data =
+        await readApiResponse<unknown>(
+            response,
+        );
+
+    return Array.isArray(data)
+        ? (data as AgentRun[])
+        : [];
+}
+
+export async function getAgentRun(
+    token: string,
+    runId: string,
+): Promise<AgentRun> {
+    const response = await fetch(
+        `${API_URL}/agents/runs/${runId}`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+
+    return readApiResponse<AgentRun>(
+        response,
+    );
+}
+
+async function readApiResponse<T>(
+    response: Response,
+): Promise<T> {
+    const data = await response.json();
+
+    if (!response.ok) {
+        const message =
+            typeof data?.message === "string"
+                ? data.message
+                : `Request failed with status ${response.status}`;
+
+        throw new Error(message);
+    }
+
+    return data as T;
 }
