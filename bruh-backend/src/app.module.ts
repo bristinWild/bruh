@@ -16,10 +16,24 @@ import { WalletsModule } from './wallets/wallets.module';
 import { AgentsModule } from './agents/agents.module';
 import { TradesModule } from './trades/trades.module';
 import { ExecutionModule } from 'src/execution/execution.module';
+import {
+  ScheduleModule,
+} from "@nestjs/schedule";
+
+import {
+  AutonomyModule,
+} from "./autonomy/autonomy.module";
+import { CustomAgentsModule } from 'src/custom-agents/custom-agents.module';
+
+import {
+  AgentRegistryModule,
+} from "./agent-registry/agent-registry.module";
+
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     PassportModule,
     JwtModule.register({
       secret: process.env.JWT_SECRET,
@@ -27,6 +41,10 @@ import { ExecutionModule } from 'src/execution/execution.module';
     }),
     ExecutionModule,
     AgentsModule,
+    AutonomyModule,
+    CustomAgentsModule,
+    AgentRegistryModule,
+
   ],
   controllers: [AuthController, WalletsController],
   providers: [
@@ -37,4 +55,4 @@ import { ExecutionModule } from 'src/execution/execution.module';
     WalletsService,
   ],
 })
-export class AppModule {}
+export class AppModule { }

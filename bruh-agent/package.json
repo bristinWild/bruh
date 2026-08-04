@@ -1,26 +1,62 @@
 {
-  "name": "bruh-agent",
-  "version": "1.0.0",
-  "description": "Autonomous forecasting agents for Bruh prediction markets on Arc",
-  "main": "dist/index.js",
+  "name": "@bruhmarket/agent-sdk",
+  "version": "0.1.1",
+  "description": "SDK for building custom autonomous forecasting agents for Bruh.",
+  "type": "commonjs",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./runtime": {
+      "types": "./dist/runtime.d.ts",
+      "import": "./dist/runtime.js",
+      "require": "./dist/runtime.js",
+      "default": "./dist/runtime.js"
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "examples",
+    "README.md",
+    "LICENSE"
   ],
+  "keywords": [
+    "ai",
+    "agent",
+    "prediction-market",
+    "forecasting",
+    "web3",
+    "autonomous-agents",
+    "bruh",
+    "sdk"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bristinWild/bruh.git",
+    "directory": "bruh-agent"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
+    "clean": "rm -rf dist",
     "build": "tsc --noEmit",
-    "build:package": "tsc -p tsconfig.build.json",
+    "build:package": "npm run clean && tsc -p tsconfig.build.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:smoke": "tsx src/test/runtime-smoke.ts",
+    "test:protocol": "tsx src/test/protocol-smoke.ts",
+    "prepack": "npm run build:package",
     "legacy:start": "tsx src/legacy-runner.ts"
   },
   "dependencies": {

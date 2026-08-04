@@ -1,4 +1,4 @@
-import { defineAgent, getAgentProfile, listAgentProfileIds, runAgentRuntime, } from "../index";
+import { defineAgent, getAgentProfile, listAgentProfileIds, runAgentRuntime, } from "../runtime";
 
 import type {
     AgentProviders,
@@ -7,11 +7,11 @@ import type {
 
 import {
     InMemoryAgentMemoryProvider,
-} from "../index";
+} from "../runtime";
 
 import {
     createAgentMemoryLifecycle,
-} from "../index";
+} from "../runtime";
 
 
 

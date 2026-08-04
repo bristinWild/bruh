@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from 'bruh-agent';
+import type { ExecutionPlan } from "@bruhmarket/agent-sdk/runtime";
 
 import { ExecutionService } from './execution.service';
 

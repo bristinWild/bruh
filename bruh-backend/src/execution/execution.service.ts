@@ -3,7 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import type { ExecutionPlan } from 'bruh-agent';
+import type { ExecutionPlan } from '@bruhmarket/agent-sdk/runtime';
 import { SupabaseService } from '../supabase.service';
 import { CircleMarketExecutor } from './circle-market.executor';
 import type { ExecutionReceipt } from './execution.types';
@@ -39,7 +39,7 @@ export class ExecutionService {
     private readonly executor: CircleMarketExecutor,
 
     private readonly supabase: SupabaseService,
-  ) {}
+  ) { }
 
   async executePlan(input: ExecuteStoredPlanInput): Promise<ExecutionReceipt> {
     const existing = await this.getReceiptByPlanId(input.plan.id);
@@ -253,8 +253,7 @@ export class ExecutionService {
 
     if (error || !data) {
       throw new Error(
-        `Failed to persist execution receipt: ${
-          error?.message ?? 'No receipt was returned.'
+        `Failed to persist execution receipt: ${error?.message ?? 'No receipt was returned.'
         }`,
       );
     }
@@ -321,8 +320,8 @@ function mapReceiptRow(row: Record<string, any>): ExecutionReceipt {
 
     ...(row.agent_id
       ? {
-          agentId: row.agent_id,
-        }
+        agentId: row.agent_id,
+      }
       : {}),
 
     profileId: row.profile_id,
@@ -333,8 +332,8 @@ function mapReceiptRow(row: Record<string, any>): ExecutionReceipt {
 
     ...(row.wallet_address
       ? {
-          walletAddress: row.wallet_address,
-        }
+        walletAddress: row.wallet_address,
+      }
       : {}),
 
     network: row.network,
@@ -349,26 +348,26 @@ function mapReceiptRow(row: Record<string, any>): ExecutionReceipt {
 
     ...(row.approval_transaction_id
       ? {
-          approvalTransactionId: row.approval_transaction_id,
-        }
+        approvalTransactionId: row.approval_transaction_id,
+      }
       : {}),
 
     ...(row.approval_transaction_hash
       ? {
-          approvalTransactionHash: row.approval_transaction_hash,
-        }
+        approvalTransactionHash: row.approval_transaction_hash,
+      }
       : {}),
 
     ...(row.trade_transaction_id
       ? {
-          tradeTransactionId: row.trade_transaction_id,
-        }
+        tradeTransactionId: row.trade_transaction_id,
+      }
       : {}),
 
     ...(row.trade_transaction_hash
       ? {
-          tradeTransactionHash: row.trade_transaction_hash,
-        }
+        tradeTransactionHash: row.trade_transaction_hash,
+      }
       : {}),
 
     status: row.status,
@@ -379,26 +378,26 @@ function mapReceiptRow(row: Record<string, any>): ExecutionReceipt {
 
     ...(row.confirmed_at
       ? {
-          confirmedAt: row.confirmed_at,
-        }
+        confirmedAt: row.confirmed_at,
+      }
       : {}),
 
     ...(row.failed_at
       ? {
-          failedAt: row.failed_at,
-        }
+        failedAt: row.failed_at,
+      }
       : {}),
 
     ...(row.error_code
       ? {
-          errorCode: row.error_code,
-        }
+        errorCode: row.error_code,
+      }
       : {}),
 
     ...(row.error_message
       ? {
-          errorMessage: row.error_message,
-        }
+        errorMessage: row.error_message,
+      }
       : {}),
 
     metadata: row.metadata ?? {},

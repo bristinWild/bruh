@@ -220,4 +220,19 @@ export interface RunAgentResponse {
   consensus?: ConsensusResult;
 }
 
+export interface AgentAutonomyConfig {
+  autonomousEnabled: boolean;
+  scheduleIntervalMinutes: number;
+  autoResearch: boolean;
+  autoTrade: boolean;
+  marketScanLimit: number;
+  lastScheduledRunAt?: string | null;
+}
 
+export interface UpdateAgentAutonomyConfig {
+  autonomousEnabled?: boolean;
+  scheduleIntervalMinutes?: number;
+  autoResearch?: boolean;
+  autoTrade?: boolean;
+  marketScanLimit?: number;
+}

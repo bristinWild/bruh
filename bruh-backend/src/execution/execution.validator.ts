@@ -1,6 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 
-import type { ExecutionPlan } from 'bruh-agent';
+import type { ExecutionPlan } from '@bruhmarket/agent-sdk/runtime';
 
 export function validateExecutionPlan(plan: ExecutionPlan): void {
   if (!plan) {

@@ -14,26 +14,30 @@ import {
   TABS,
 } from "@/components/dashboard/dashboard.constants";
 import type {
+  AgentAutonomyConfig,
   AgentRun,
   AgentState,
   AgentWallet,
   ConsensusResult,
   DashboardTab,
   Trade,
+  UpdateAgentAutonomyConfig,
 } from "@/components/dashboard/dashboard.types";
 import { getAgentTheme } from "@/src/lib/agentTheme";
-
 import {
   createAgentWallet,
+  getAgentAutonomy,
   getAgentRuns,
   getMyWallets,
   runAgent,
+  updateAgentAutonomy,
 } from "@/src/lib/api";
 import ConsensusOverview from "@/components/dashboard/ConsensusOverview";
 import ProfileReasoningGrid from "@/components/dashboard/ProfileReasoningGrid";
 import ExecutionPlanCard from "@/components/dashboard/ExecutionPlanCard";
 import AgentTimeline from "@/components/dashboard/AgentTimeline";
 import RunHistoryPanel from "@/components/dashboard/RunHistoryPanel";
+import AutonomyPanel from "@/components/dashboard/AutonomyPanel";
 
 
 const DEFAULT_MARKET_ADDRESS =
@@ -62,6 +66,32 @@ export default function Dashboard() {
       null,
     );
   const [runError, setRunError] =
+    useState<string | null>(null);
+
+  const [
+    autonomyConfig,
+    setAutonomyConfig,
+  ] =
+    useState<AgentAutonomyConfig | null>(
+      null,
+    );
+
+  const [
+    autonomyLoading,
+    setAutonomyLoading,
+  ] =
+    useState(false);
+
+  const [
+    autonomySaving,
+    setAutonomySaving,
+  ] =
+    useState(false);
+
+  const [
+    autonomyError,
+    setAutonomyError,
+  ] =
     useState<string | null>(null);
 
 
@@ -173,6 +203,57 @@ export default function Dashboard() {
     }
 
     void fetchRuns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    token,
+    selected?.id,
+  ]);
+
+  useEffect(() => {
+    if (!token || !selected) {
+      setAutonomyConfig(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadAutonomy() {
+      setAutonomyLoading(true);
+      setAutonomyError(null);
+
+      try {
+        const config =
+          await getAgentAutonomy(
+            token!,
+            selected!.id,
+          );
+
+        if (!cancelled) {
+          setAutonomyConfig(
+            config,
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setAutonomyError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load autonomy settings.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setAutonomyLoading(
+            false,
+          );
+        }
+      }
+    }
+
+    void loadAutonomy();
 
     return () => {
       cancelled = true;
@@ -326,6 +407,49 @@ export default function Dashboard() {
       setAgentState("idle");
     } finally {
       setCreating(false);
+    }
+  }
+
+
+  async function handleAutonomySave(
+    patch: UpdateAgentAutonomyConfig,
+  ) {
+    if (!token || !selected) {
+      return;
+    }
+
+    setAutonomySaving(true);
+    setAutonomyError(null);
+
+    try {
+      await updateAgentAutonomy(
+        token,
+        selected.id,
+        patch,
+      );
+
+      const refreshed =
+        await getAgentAutonomy(
+          token,
+          selected.id,
+        );
+
+      setAutonomyConfig(
+        refreshed,
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to update autonomy settings.";
+
+      setAutonomyError(
+        message,
+      );
+
+      throw error;
+    } finally {
+      setAutonomySaving(false);
     }
   }
 
@@ -611,6 +735,24 @@ export default function Dashboard() {
                         "running"
                       }
                     />
+                    <AutonomyPanel
+                      config={
+                        autonomyConfig
+                      }
+                      loading={
+                        autonomyLoading
+                      }
+                      saving={
+                        autonomySaving
+                      }
+                      error={
+                        autonomyError
+                      }
+                      onSave={
+                        handleAutonomySave
+                      }
+                    />
+
                   </div>
                 </div>
               )}

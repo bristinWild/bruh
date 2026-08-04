@@ -2,7 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 import { randomUUID } from 'node:crypto';
 
-import type { ExecutionPlan } from 'bruh-agent';
+import type { ExecutionPlan } from '@bruhmarket/agent-sdk/runtime';
 
 import { SupabaseService } from '../supabase.service';
 
@@ -34,7 +34,7 @@ export class ExecutionQueueService implements OnModuleInit {
     private readonly supabase: SupabaseService,
 
     private readonly execution: ExecutionService,
-  ) {}
+  ) { }
 
   async onModuleInit() {
     /**

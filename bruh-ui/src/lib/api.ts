@@ -3,6 +3,8 @@
 import type {
     AgentRun,
     RunAgentResponse,
+    AgentAutonomyConfig,
+    UpdateAgentAutonomyConfig,
 } from "@/components/dashboard/dashboard.types";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -147,4 +149,59 @@ async function readApiResponse<T>(
     }
 
     return data as T;
+}
+
+
+export async function getAgentAutonomy(
+    token: string,
+    walletId: string,
+): Promise<AgentAutonomyConfig> {
+    const response = await fetch(
+        `${API_URL}/agents/${walletId}/autonomy`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`,
+            },
+        },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data?.message ??
+            `Failed to load autonomy configuration with status ${response.status}`,
+        );
+    }
+
+    return data as AgentAutonomyConfig;
+}
+
+export async function updateAgentAutonomy(
+    token: string,
+    walletId: string,
+    config: UpdateAgentAutonomyConfig,
+): Promise<unknown> {
+    const response = await fetch(
+        `${API_URL}/agents/${walletId}/autonomy`,
+        {
+            method: "PATCH",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(config),
+        },
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data?.message ??
+            `Failed to update autonomy configuration with status ${response.status}`,
+        );
+    }
+
+    return data;
 }

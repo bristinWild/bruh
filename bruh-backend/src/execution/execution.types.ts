@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from 'bruh-agent';
+import type { ExecutionPlan } from '@bruhmarket/agent-sdk/runtime';
 
 export type ExecutionReceiptStatus =
   'submitted' | 'confirmed' | 'failed' | 'rejected' | 'expired';
