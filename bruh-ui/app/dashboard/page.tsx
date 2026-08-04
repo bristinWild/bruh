@@ -994,93 +994,19 @@ export default function Dashboard() {
 
                     <div className="flex min-w-0 flex-col gap-5">
 
-                      {selectedInstallation &&
-                        installedRunResult && (
-                          <div className="rounded-[22px] border border-black/10 bg-[#fffdf8] p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
-                                  Installed agent result
-                                </p>
-
-                                <h2 className="mt-2 text-xl font-black text-slate-950">
-                                  {
-                                    selectedInstallation
-                                      .listing.name
-                                  }
-                                </h2>
-                              </div>
-
-                              <span className="rounded-full bg-slate-950 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-white">
-                                {
-                                  installedRunResult
-                                    .decision.action
-                                }
-                              </span>
-                            </div>
-
-                            <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                              <StatCard
-                                label="Probability"
-                                value={`${(
-                                  installedRunResult
-                                    .decision.probability *
-                                  100
-                                ).toFixed(1)}%`}
-                              />
-
-                              <StatCard
-                                label="Edge"
-                                value={`${(
-                                  installedRunResult
-                                    .decision.edge *
-                                  100
-                                ).toFixed(1)}%`}
-                              />
-
-                              <StatCard
-                                label="Confidence"
-                                value={`${(
-                                  installedRunResult
-                                    .decision.confidence *
-                                  100
-                                ).toFixed(1)}%`}
-                              />
-                            </div>
-
-                            <p className="mt-5 text-sm leading-6 text-slate-600">
-                              {
-                                installedRunResult
-                                  .decision.reasoning
-                              }
-                            </p>
-                          </div>
-                        )}
-                      {selected ? (
-                        <ConsensusOverview
-                          consensus={
-                            latestConsensus
-                          }
-                          latestRun={
-                            latestRun
-                          }
-                          error={
-                            runError
-                          }
-                        />
-                      ) : selectedInstallation &&
-                        !installedRunResult &&
-                        !latestRun ? (
-                        <div className="rounded-[22px] border border-black/10 bg-[#fffdf8] p-6">
-                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
-                            Installed agent
-                          </p>
-
-                          <h2 className="mt-2 text-xl font-black text-slate-950">
-                            Run this agent to generate a forecast.
-                          </h2>
-                        </div>
-                      ) : null}
+                      <ConsensusOverview
+                        consensus={
+                          selected
+                            ? latestConsensus
+                            : null
+                        }
+                        latestRun={
+                          latestRun
+                        }
+                        error={
+                          runError
+                        }
+                      />
 
                       {selected ? (
                         <ProfileReasoningGrid
