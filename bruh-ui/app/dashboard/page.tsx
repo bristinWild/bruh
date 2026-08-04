@@ -44,22 +44,13 @@ import AgentTimeline from "@/components/dashboard/AgentTimeline";
 import RunHistoryPanel from "@/components/dashboard/RunHistoryPanel";
 import AutonomyPanel from "@/components/dashboard/AutonomyPanel";
 
+import {
+  getOpenRunnableMarkets,
+  type RunnableMarket,
+} from "@/src/lib/runnableMarkets";
 
-const DEFAULT_MARKET_ADDRESS =
-  "0xcae8072e80e78ab243d42f74819b037dde623b7b";
 
-const DEFAULT_INSTALLED_MARKET = {
-  id: "fed-september-2026",
-  address:
-    "0xcae8072e80e78ab243d42f74819b037dde623b7b",
-  question:
-    "Will the Fed announce a rate cut in September 2026?",
-  yesPrice: 0.4791735856582144,
-  noPrice: 0.5208264143417856,
-  open: true,
-  resolved: false,
-  network: "eip155:5042002",
-};
+
 
 export default function Dashboard() {
   const [token, setToken] = useState<string | null>(null);
@@ -76,6 +67,17 @@ export default function Dashboard() {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [latestRun, setLatestRun] = useState<AgentRun | null>(null);
+
+  const openMarkets =
+    getOpenRunnableMarkets();
+
+  const [
+    selectedMarket,
+    setSelectedMarket,
+  ] =
+    useState<RunnableMarket | null>(
+      openMarkets[0] ?? null,
+    );
 
   const [
     installedAgents,
@@ -586,6 +588,7 @@ export default function Dashboard() {
   async function handleRun() {
     if (
       !token ||
+      !selectedMarket ||
       (!selected &&
         !selectedInstallation)
     ) {
@@ -609,7 +612,7 @@ export default function Dashboard() {
             installationId,
             {
               market:
-                DEFAULT_INSTALLED_MARKET,
+                selectedMarket,
             },
           );
 
@@ -647,7 +650,7 @@ export default function Dashboard() {
         await runAgent(
           token,
           selected.id,
-          DEFAULT_MARKET_ADDRESS,
+          selectedMarket.address,
           false,
         );
 
@@ -968,12 +971,92 @@ export default function Dashboard() {
                         </div>
                       ) : null}
 
+
+                      <div className="rounded-[18px] border border-black/10 bg-[#fffdf8] p-4">
+                        <label
+                          htmlFor="agent-market"
+                          className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400"
+                        >
+                          Forecast market
+                        </label>
+
+                        {openMarkets.length > 0 ? (
+                          <select
+                            id="agent-market"
+                            value={
+                              selectedMarket?.id ?? ""
+                            }
+                            onChange={(event) => {
+                              const nextMarket =
+                                openMarkets.find(
+                                  (market) =>
+                                    market.id ===
+                                    event.target.value,
+                                ) ?? null;
+
+                              setSelectedMarket(
+                                nextMarket,
+                              );
+
+                              setLatestConsensus(null);
+                              setInstalledRunResult(null);
+                              setRunError(null);
+                            }}
+                            disabled={
+                              agentState === "running"
+                            }
+                            className="mt-3 w-full rounded-[13px] border border-black/10 bg-white px-3 py-3 text-xs font-semibold text-slate-700 outline-none focus:border-violet-400 disabled:opacity-60"
+                          >
+                            {openMarkets.map(
+                              (market) => (
+                                <option
+                                  key={market.id}
+                                  value={market.id}
+                                >
+                                  {market.question}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        ) : (
+                          <p className="mt-3 text-xs text-amber-700">
+                            No open markets are currently
+                            available.
+                          </p>
+                        )}
+
+                        {selectedMarket && (
+                          <div className="mt-3 flex items-center justify-between text-[9px] font-black uppercase tracking-[0.1em] text-slate-400">
+                            <span>
+                              YES{" "}
+                              {(
+                                selectedMarket.yesPrice *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </span>
+
+                            <span>
+                              NO{" "}
+                              {(
+                                selectedMarket.noPrice *
+                                100
+                              ).toFixed(1)}
+                              %
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
                       <button
                         type="button"
                         onClick={
                           agentState === "running"
                             ? () => void handleStop()
                             : () => void handleRun()
+                        }
+                        disabled={
+                          !selectedMarket
                         }
                         className="w-full rounded-2xl py-4 text-sm font-semibold text-white"
                         style={{
