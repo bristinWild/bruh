@@ -1,55 +1,70 @@
-import { CONFIG } from "./config.js";
-import { runAgentCycle, AgentConfig } from "./agent.js";
+export {
+    defineAgent,
+    DefineAgentError,
+    assertValidAgentManifest,
+    normalizeAgentManifest,
+    validateAgentManifest,
+    AgentManifestValidationError,
+} from "./sdk/index.js";
 
-const AGENTS: AgentConfig[] = [
-    {
-        name: "Newshound",
-        strategy: "news momentum — weights recent developments heavily",
-        privateKey: CONFIG.NEWSHOUND_KEY,
-        markets: [CONFIG.MARKET_1, CONFIG.MARKET_2],
-    },
-    {
-        name: "Actuary",
-        strategy: "base rates — anchors on historical priors, fades overconfident moves",
-        privateKey: CONFIG.ACTUARY_KEY,
-        markets: [CONFIG.MARKET_1, CONFIG.MARKET_2],
-    },
-];
+export type {
+    AgentManifest,
+    AgentManifestAuthor,
+    AgentManifestCapability,
+    AgentManifestPermissions,
+    AgentManifestRepository,
+    AgentManifestRiskDefaults,
+    AgentManifestRuntime,
+    AgentManifestValidationIssue,
+    AgentManifestValidationResult,
+    CustomAgentHooks,
+    DefineAgentInput,
+    DefinedAgent,
+} from "./sdk/index.js";
 
-async function main() {
-    console.log("🚀 Bruh Agent System starting...");
-    console.log(`   Markets: ${CONFIG.MARKET_1}, ${CONFIG.MARKET_2}`);
-    console.log(`   Cycle interval: ${CONFIG.CYCLE_INTERVAL_MS / 1000}s`);
-    console.log(`   Edge threshold: ${CONFIG.EDGE_THRESHOLD * 100}%`);
-    console.log(`   Kelly fraction: ${CONFIG.KELLY_FRACTION * 100}%\n`);
+export type {
+    AgentAction,
+    AgentEstimate,
+    AgentMarket,
+    AgentProfile,
+    AgentProfileDefaults,
+    AgentProviders,
+    AgentReasoningContext,
+    AgentResearchContext,
+    AgentResearchResult,
+    AgentRuntimeConfig,
+    HistoricalProvider,
+    LlmEstimateInput,
+    LlmProvider,
+    NewsProvider,
+    OnchainProvider,
+    PaidResearchProvider,
+    PaidResearchRequest,
+    PaidResearchResult,
+    ResearchEvidence,
+} from "./core/types.js";
 
-    // Filter agents with valid keys
-    const activeAgents = AGENTS.filter(
-        (a) => a.privateKey && a.privateKey !== "undefined"
-    );
 
-    if (activeAgents.length === 0) {
-        console.error("❌ No agent private keys configured. Set NEWSHOUND_PRIVATE_KEY or ACTUARY_PRIVATE_KEY in .env");
-        process.exit(1);
-    }
+export {
+    CUSTOM_AGENT_PROTOCOL_VERSION,
+    CustomAgentProtocolError,
+    validateCustomAgentResponse,
+} from "./protocol";
 
-    console.log(`✅ ${activeAgents.length} agent(s) active: ${activeAgents.map((a) => a.name).join(", ")}\n`);
 
-    // Main loop
-    while (true) {
-        console.log(`\n${"=".repeat(60)}`);
-        console.log(`⏰ ${new Date().toISOString()}`);
-        console.log("=".repeat(60));
 
-        for (const agent of activeAgents) {
-            const decisions = await runAgentCycle(agent);
-            const trades = decisions.filter((d) => d.action !== "PASS");
-            console.log(`\n📋 [${agent.name}] Cycle complete — ${trades.length} trade(s) executed`);
-        }
-
-        console.log(`\n😴 Sleeping ${CONFIG.CYCLE_INTERVAL_MS / 1000}s...\n`);
-        await new Promise((r) => setTimeout(r, CONFIG.CYCLE_INTERVAL_MS));
-    }
-}
-
-main().catch(console.error);
+export type {
+    CustomAgentAction,
+    CustomAgentErrorResponse,
+    CustomAgentEvidence,
+    CustomAgentHealthResponse,
+    CustomAgentProtocolVersion,
+    CustomAgentResearchOutput,
+    CustomAgentResponse,
+    CustomAgentRunConfig,
+    CustomAgentRunMarket,
+    CustomAgentRunPermissions,
+    CustomAgentRunRequest,
+    CustomAgentRunResponse,
+    CustomAgentEstimateOutput,
+} from "./protocol";
