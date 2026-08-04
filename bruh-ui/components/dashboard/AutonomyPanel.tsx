@@ -97,6 +97,7 @@ export default function AutonomyPanel({
                     enabled={
                         form.autonomousEnabled
                     }
+
                 />
             </div>
 
@@ -304,8 +305,8 @@ function SettingRow({
             <div>
                 <p
                     className={`text-sm font-black ${warning
-                            ? "text-amber-800"
-                            : "text-slate-950"
+                        ? "text-amber-800"
+                        : "text-slate-950"
                         }`}
                 >
                     {title}
@@ -370,10 +371,10 @@ function Toggle({
                 onChange(!checked)
             }
             className={`relative h-7 w-12 shrink-0 rounded-full transition ${checked
-                    ? danger
-                        ? "bg-red-500"
-                        : "bg-violet-500"
-                    : "bg-slate-200"
+                ? danger
+                    ? "bg-red-500"
+                    : "bg-violet-500"
+                : "bg-slate-200"
                 } ${disabled
                     ? "cursor-not-allowed opacity-50"
                     : ""
@@ -381,8 +382,8 @@ function Toggle({
         >
             <span
                 className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${checked
-                        ? "left-6"
-                        : "left-1"
+                    ? "left-6"
+                    : "left-1"
                     }`}
             />
         </button>
@@ -397,8 +398,8 @@ function StatusBadge({
     return (
         <span
             className={`rounded-full border px-4 py-2 text-[8px] font-black uppercase tracking-[0.14em] ${enabled
-                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                    : "border-slate-200 bg-slate-50 text-slate-500"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                : "border-slate-200 bg-slate-50 text-slate-500"
                 }`}
         >
             {enabled

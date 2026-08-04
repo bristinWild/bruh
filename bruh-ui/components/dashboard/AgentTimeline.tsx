@@ -130,15 +130,14 @@ function buildTimelineEvents({
     consensus: ConsensusResult | null;
     isRunning: boolean;
 }): TimelineEvent[] {
-    const events: TimelineEvent[] =
-        [];
+    const events: TimelineEvent[] = [];
 
     if (isRunning) {
         events.push({
             id: "runtime-active",
             label: "Agent runtime active",
             detail:
-                "Profiles are researching and evaluating the selected market.",
+                "The agent is researching and evaluating the selected market.",
             status: "active",
         });
     }
@@ -148,7 +147,7 @@ function buildTimelineEvents({
             (member) => member.runId,
         ) ?? [];
 
-    const latestProfiles =
+    const relevantRuns =
         currentMemberRunIds.length > 0
             ? runs
                 .filter((run) =>
@@ -158,18 +157,20 @@ function buildTimelineEvents({
                 )
                 .sort(
                     (a, b) =>
-                        new Date(a.created_at).getTime() -
-                        new Date(b.created_at).getTime(),
+                        new Date(
+                            a.created_at,
+                        ).getTime() -
+                        new Date(
+                            b.created_at,
+                        ).getTime(),
                 )
-            : runs
-                .filter(
-                    (run) =>
-                        run.profile_id !==
-                        "ensemble",
-                )
-                .slice(0, 1);
+            : runs.slice(0, 1);
 
-    for (const run of latestProfiles) {
+    for (const run of relevantRuns) {
+        const timestamp =
+            run.completed_at ??
+            run.created_at;
+
         events.push({
             id: `${run.id}-research`,
             label: `${formatProfile(
@@ -178,9 +179,7 @@ function buildTimelineEvents({
             detail:
                 run.research?.summary ??
                 "Research stage completed.",
-            timestamp:
-                run.completed_at ??
-                run.created_at,
+            timestamp,
             status:
                 run.status === "failed"
                     ? "failed"
@@ -199,16 +198,64 @@ function buildTimelineEvents({
                 detail: `${(
                     run.decision.probability *
                     100
-                ).toFixed(1)}% forecast with ${(
+                ).toFixed(
+                    1,
+                )}% probability · ${(
                     run.decision.confidence *
                     100
-                ).toFixed(1)}% confidence.`,
-                timestamp:
-                    run.completed_at ??
-                    run.created_at,
+                ).toFixed(
+                    1,
+                )}% confidence · ${(
+                    run.decision.edge *
+                    100
+                ).toFixed(
+                    1,
+                )}% edge.`,
+                timestamp,
                 status:
                     run.decision.action ===
                         "PASS"
+                        ? "skipped"
+                        : "complete",
+            });
+        }
+
+        if (run.execution_plan) {
+            const allowExecution =
+                run.execution_plan
+                    .execution
+                    ?.allowExecution ??
+                false;
+
+            events.push({
+                id: `${run.id}-execution`,
+                label:
+                    run.execution_plan
+                        .status ===
+                        "skipped"
+                        ? "Execution skipped"
+                        : allowExecution
+                            ? "Execution plan ready"
+                            : "Execution blocked",
+                detail:
+                    run.execution_plan
+                        .status ===
+                        "skipped"
+                        ? "The run completed without creating an executable position."
+                        : allowExecution
+                            ? `${run.execution_plan.amountUsdc.toFixed(
+                                2,
+                            )} USDC position approved by the runtime.`
+                            : "The runtime risk checks prevented execution.",
+                timestamp:
+                    run.execution_plan
+                        .createdAt ??
+                    timestamp,
+                status:
+                    run.execution_plan
+                        .status ===
+                        "skipped" ||
+                        !allowExecution
                         ? "skipped"
                         : "complete",
             });
@@ -232,29 +279,35 @@ function buildTimelineEvents({
                 consensus.executionPlan
                     .createdAt,
             status:
-                consensus.action === "PASS"
+                consensus.action ===
+                    "PASS"
                     ? "skipped"
                     : "complete",
         });
 
         events.push({
             id: `${consensus.id}-execution`,
-            label: consensus.executionPlan
-                .execution.allowExecution
-                ? "Execution plan ready"
-                : "Execution skipped",
-            detail: consensus.executionPlan
-                .execution.allowExecution
-                ? `${consensus.amountUsdc.toFixed(
-                    2,
-                )} USDC position approved by the runtime.`
-                : "No executable edge was identified.",
+            label:
+                consensus.executionPlan
+                    .execution
+                    .allowExecution
+                    ? "Execution plan ready"
+                    : "Execution skipped",
+            detail:
+                consensus.executionPlan
+                    .execution
+                    .allowExecution
+                    ? `${consensus.amountUsdc.toFixed(
+                        2,
+                    )} USDC position approved by the runtime.`
+                    : "No executable edge was identified.",
             timestamp:
                 consensus.executionPlan
                     .createdAt,
             status:
                 consensus.executionPlan
-                    .execution.allowExecution
+                    .execution
+                    .allowExecution
                     ? "complete"
                     : "skipped",
         });

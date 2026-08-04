@@ -28,9 +28,14 @@ import {
   createAgentWallet,
   getAgentAutonomy,
   getAgentRuns,
+  getMyAgentInstallations,
   getMyWallets,
   runAgent,
+  runInstalledAgent,
   updateAgentAutonomy,
+  type InstalledAgent,
+  type InstalledAgentRunResult,
+  getInstalledAgentRuns,
 } from "@/src/lib/api";
 import ConsensusOverview from "@/components/dashboard/ConsensusOverview";
 import ProfileReasoningGrid from "@/components/dashboard/ProfileReasoningGrid";
@@ -42,6 +47,19 @@ import AutonomyPanel from "@/components/dashboard/AutonomyPanel";
 
 const DEFAULT_MARKET_ADDRESS =
   "0xcae8072e80e78ab243d42f74819b037dde623b7b";
+
+const DEFAULT_INSTALLED_MARKET = {
+  id: "fed-september-2026",
+  address:
+    "0xcae8072e80e78ab243d42f74819b037dde623b7b",
+  question:
+    "Will the Fed announce a rate cut in September 2026?",
+  yesPrice: 0.4791735856582144,
+  noPrice: 0.5208264143417856,
+  open: true,
+  resolved: false,
+  network: "eip155:5042002",
+};
 
 export default function Dashboard() {
   const [token, setToken] = useState<string | null>(null);
@@ -58,6 +76,21 @@ export default function Dashboard() {
   const [walletModalOpen, setWalletModalOpen] = useState(false);
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [latestRun, setLatestRun] = useState<AgentRun | null>(null);
+
+  const [
+    installedAgents,
+    setInstalledAgents,
+  ] = useState<InstalledAgent[]>([]);
+
+  const [
+    selectedInstallation,
+    setSelectedInstallation,
+  ] = useState<InstalledAgent | null>(null);
+
+  const [
+    installedRunResult,
+    setInstalledRunResult,
+  ] = useState<InstalledAgentRunResult | null>(null);
   const [
     latestConsensus,
     setLatestConsensus,
@@ -134,14 +167,18 @@ export default function Dashboard() {
       return;
     }
 
+    const currentToken = token;
+    const selectedWalletId =
+      selected.id;
+
     let cancelled = false;
 
     async function fetchRuns() {
       try {
         const nextRuns =
           await getAgentRuns(
-            token,
-            selected.id,
+            currentToken,
+            selectedWalletId,
             30,
           );
 
@@ -218,6 +255,10 @@ export default function Dashboard() {
       return;
     }
 
+    const currentToken = token;
+    const selectedWalletId =
+      selected.id;
+
     let cancelled = false;
 
     async function loadAutonomy() {
@@ -227,8 +268,8 @@ export default function Dashboard() {
       try {
         const config =
           await getAgentAutonomy(
-            token!,
-            selected!.id,
+            currentToken,
+            selectedWalletId,
           );
 
         if (!cancelled) {
@@ -261,6 +302,67 @@ export default function Dashboard() {
   }, [
     token,
     selected?.id,
+  ]);
+
+  useEffect(() => {
+    if (
+      !token ||
+      !selectedInstallation
+    ) {
+      return;
+    }
+
+    const currentToken =
+      token;
+
+    const installationId =
+      selectedInstallation
+        .installation.id;
+
+    let cancelled =
+      false;
+
+    async function loadInstalledRuns() {
+      try {
+        const nextRuns =
+          await getInstalledAgentRuns(
+            currentToken,
+            installationId,
+            30,
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        setRuns(nextRuns);
+
+        setLatestRun(
+          nextRuns[0] ??
+          null,
+        );
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Failed to load installed-agent runs:",
+            error,
+          );
+
+          setRuns([]);
+          setLatestRun(null);
+        }
+      }
+    }
+
+    void loadInstalledRuns();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    token,
+    selectedInstallation
+      ?.installation.id,
   ]);
 
 
@@ -333,48 +435,60 @@ export default function Dashboard() {
     [],
   );
 
-  const loadWallets = useCallback(
+  const loadAgents = useCallback(
     async (jwt: string) => {
       try {
-        const response =
-          await getMyWallets(jwt);
+        const [
+          walletResponse,
+          installationResponse,
+        ] = await Promise.all([
+          getMyWallets(jwt),
+          getMyAgentInstallations(jwt),
+        ]);
 
-        const nextWallets:
-          AgentWallet[] =
-          Array.isArray(response)
-            ? response
+        const nextWallets: AgentWallet[] =
+          Array.isArray(walletResponse)
+            ? walletResponse
+            : [];
+
+        const nextInstallations: InstalledAgent[] =
+          Array.isArray(installationResponse)
+            ? installationResponse
             : [];
 
         setWallets(nextWallets);
+        setInstalledAgents(
+          nextInstallations.filter(
+            (item) =>
+              item.installation.enabled,
+          ),
+        );
 
         setSelected((current) => {
-          if (
-            nextWallets.length === 0
-          ) {
-            return null;
+          if (current) {
+            const retained =
+              nextWallets.find(
+                (wallet) =>
+                  wallet.id === current.id,
+              );
+
+            if (retained) {
+              return retained;
+            }
           }
 
-          const retained = current
-            ? nextWallets.find(
-              (wallet) =>
-                wallet.id ===
-                current.id,
-            )
-            : undefined;
-
-          return (
-            retained ??
-            nextWallets[0]
-          );
+          return nextWallets[0] ?? null;
         });
       } catch (error) {
         console.error(
-          "Failed to load wallets:",
+          "Failed to load dashboard agents:",
           error,
         );
 
         setWallets([]);
+        setInstalledAgents([]);
         setSelected(null);
+        setSelectedInstallation(null);
       } finally {
         setLoading(false);
       }
@@ -385,9 +499,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (token) {
-      void loadWallets(token);
+      void loadAgents(token);
     }
-  }, [token, loadWallets]);
+  }, [token, loadAgents]);
 
   async function handleCreateAgent() {
     if (!token || !selectedStrategy || !agentName.trim()) return;
@@ -400,7 +514,7 @@ export default function Dashboard() {
         agentName.trim(),
       )) as AgentWallet;
 
-      await loadWallets(token);
+      await loadAgents(token);
       setSelected(wallet);
       setAgentName("");
       setSelectedStrategy(null);
@@ -470,15 +584,61 @@ export default function Dashboard() {
   }
 
   async function handleRun() {
-    if (!token || !selected) {
+    if (
+      !token ||
+      (!selected &&
+        !selectedInstallation)
+    ) {
       return;
     }
 
     setAgentState("running");
     setRunError(null);
     setLatestConsensus(null);
+    setInstalledRunResult(null);
 
     try {
+      if (selectedInstallation) {
+        const installationId =
+          selectedInstallation
+            .installation.id;
+
+        const result =
+          await runInstalledAgent(
+            token,
+            installationId,
+            {
+              market:
+                DEFAULT_INSTALLED_MARKET,
+            },
+          );
+
+        setInstalledRunResult(
+          result,
+        );
+
+        const nextRuns =
+          await getInstalledAgentRuns(
+            token,
+            installationId,
+            30,
+          );
+
+        setRuns(nextRuns);
+
+        setLatestRun(
+          nextRuns[0] ??
+          null,
+        );
+
+        setAgentState("done");
+        return;
+      }
+
+      if (!selected) {
+        return;
+      }
+
       await updateStatus(
         "active",
       );
@@ -516,34 +676,64 @@ export default function Dashboard() {
 
       setAgentState("idle");
     } finally {
-      try {
-        await updateStatus(
-          "paused",
-        );
-      } catch (error) {
-        console.error(
-          "Failed to pause agent:",
-          error,
-        );
+      if (selected) {
+        try {
+          await updateStatus(
+            "paused",
+          );
+        } catch (error) {
+          console.error(
+            "Failed to pause agent:",
+            error,
+          );
+        }
       }
     }
   }
 
   async function handleStop() {
-    await updateStatus("paused");
+    if (selected) {
+      await updateStatus("paused");
+    }
+
     setAgentState("idle");
   }
+
   function selectWallet(
     wallet: AgentWallet,
   ) {
     setSelected(wallet);
+    setSelectedInstallation(null);
+
     setAgentState("idle");
     setActiveTab("agent");
+
     setLatestConsensus(null);
+    setInstalledRunResult(null);
     setRunError(null);
+
     setRuns([]);
     setLatestRun(null);
     setTrades([]);
+  }
+
+  function selectInstalledAgent(
+    item: InstalledAgent,
+  ) {
+    setSelected(null);
+    setSelectedInstallation(item);
+
+    setAgentState("idle");
+    setActiveTab("agent");
+
+    setLatestConsensus(null);
+    setInstalledRunResult(null);
+    setRunError(null);
+
+    setRuns([]);
+    setLatestRun(null);
+    setTrades([]);
+    setAutonomyConfig(null);
   }
 
   if (!loading && !token) {
@@ -585,187 +775,444 @@ export default function Dashboard() {
           tradeCount={executedTrades.length}
         />
 
-        {wallets.length > 0 && (
-          <div className="mb-7 flex flex-wrap items-center gap-2 rounded-[20px] border border-black/10 bg-[#fffdf8]/70 p-3">
-            {wallets.map((wallet) => (
-              <button
-                key={wallet.id}
-                type="button"
-                onClick={() => void selectWallet(wallet)}
-                className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em]"
-              >
-                <AgentAvatar seed={wallet.agent_name || wallet.id} size={20} />
-                {wallet.agent_name || wallet.strategy}
-              </button>
-            ))}
+        {(wallets.length > 0 ||
+          installedAgents.length > 0) && (
+            <div className="mb-7 flex flex-wrap items-center gap-2 rounded-[20px] border border-black/10 bg-[#fffdf8]/70 p-3">
+              {wallets.map((wallet) => (
+                <button
+                  key={wallet.id}
+                  type="button"
+                  onClick={() => void selectWallet(wallet)}
+                  className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em]"
+                >
+                  <AgentAvatar seed={wallet.agent_name || wallet.id} size={20} />
+                  {wallet.agent_name || wallet.strategy}
+                </button>
+              ))}
 
-            <button
-              type="button"
-              onClick={() => setSelected(null)}
-              className="rounded-full border border-dashed border-violet-300 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-600"
-            >
-              + New agent
-            </button>
-          </div>
-        )}
+              {installedAgents.length > 0 && (
+                <>
+                  <span className="mx-2 h-7 w-px bg-black/10" />
 
-        <AnimatePresence mode="wait">
-          {(!selected || wallets.length === 0) && (
-            <CreateAgentPanel
-              agentName={agentName}
-              selectedStrategy={selectedStrategy}
-              creating={creating}
-              onNameChange={setAgentName}
-              onStrategyChange={setSelectedStrategy}
-              onCreate={() => void handleCreateAgent()}
-            />
-          )}
+                  {installedAgents.map((item) => {
+                    const active =
+                      selectedInstallation
+                        ?.installation.id ===
+                      item.installation.id;
 
-          {selected && wallets.length > 0 && (
-            <motion.div
-              key="agent-shell"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="mb-7 flex items-center gap-1 rounded-[16px] border border-black/10 bg-[#fffdf8]/70 p-1.5">
-                {TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className="rounded-[11px] px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em]"
-                    style={{
-                      color: activeTab === tab.id ? "#fff" : "#64748B",
-                      background:
-                        activeTab === tab.id
-                          ? "linear-gradient(135deg, #8B5CF6, #3B82F6)"
-                          : "transparent",
-                    }}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {activeTab === "agent" && (
-                <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
-                  <div className="flex flex-col gap-4">
-                    {agentState === "running" ? (
-                      <div className="flex aspect-square flex-col items-center justify-center rounded-2xl bg-slate-950 p-6 text-center text-white">
+                    return (
+                      <button
+                        key={item.installation.id}
+                        type="button"
+                        onClick={() =>
+                          selectInstalledAgent(item)
+                        }
+                        className={`flex items-center gap-2 rounded-full border px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition ${active
+                          ? "border-violet-500 bg-violet-500 text-white"
+                          : "border-violet-200 bg-violet-50 text-violet-700"
+                          }`}
+                      >
                         <AgentAvatar
-                          seed={selected.agent_name || selected.id}
-                          size={68}
+                          seed={
+                            item.listing.name ||
+                            item.installation.id
+                          }
+                          size={20}
                         />
-                        <p className="mt-5 text-xs text-cyan-300">
-                          {RUNNING_MESSAGES[runningMessageIndex]}
-                        </p>
-                      </div>
-                    ) : (
-                      <AgentProfileCard
-                        agent={selected}
-                        onOpenWallet={() => setWalletModalOpen(true)}
-                      />
-                    )}
 
-                    <button
-                      type="button"
-                      onClick={
-                        agentState === "running"
-                          ? () => void handleStop()
-                          : () => void handleRun()
-                      }
-                      className="w-full rounded-2xl py-4 text-sm font-semibold text-white"
-                      style={{
-                        background:
-                          agentState === "running"
-                            ? "linear-gradient(135deg, #EF4444, #DC2626)"
-                            : `linear-gradient(135deg, ${selectedTheme?.primary || "#8B5CF6"
-                            }, ${selectedTheme?.secondary || "#3B82F6"})`,
-                      }}
-                    >
-                      {agentState === "running"
-                        ? "Stop agent"
-                        : agentState === "done"
-                          ? "Run agent again →"
-                          : "Run agent →"}
-                    </button>
-                  </div>
+                        {item.listing.name}
 
-                  <div className="flex min-w-0 flex-col gap-5">
-                    <ConsensusOverview
-                      consensus={
-                        latestConsensus
-                      }
-                      latestRun={
-                        latestRun
-                      }
-                      error={
-                        runError
-                      }
-                    />
-
-                    <ProfileReasoningGrid
-                      runs={
-                        runs
-                      }
-                      consensus={
-                        latestConsensus
-                      }
-                    />
-
-                    <ExecutionPlanCard
-                      plan={
-                        latestConsensus
-                          ?.executionPlan ??
-                        latestRun
-                          ?.execution_plan ??
-                        null
-                      }
-                    />
-
-                    <AgentTimeline
-                      runs={
-                        runs
-                      }
-                      consensus={
-                        latestConsensus
-                      }
-                      isRunning={
-                        agentState ===
-                        "running"
-                      }
-                    />
-                    <AutonomyPanel
-                      config={
-                        autonomyConfig
-                      }
-                      loading={
-                        autonomyLoading
-                      }
-                      saving={
-                        autonomySaving
-                      }
-                      error={
-                        autonomyError
-                      }
-                      onSave={
-                        handleAutonomySave
-                      }
-                    />
-
-                  </div>
-                </div>
+                        <span className="rounded-full bg-black/10 px-2 py-0.5 text-[7px]">
+                          Installed
+                        </span>
+                      </button>
+                    );
+                  })}
+                </>
               )}
 
-              {activeTab === "pnl" && <PnlPanel trades={trades} />}
-              {activeTab ===
-                "transactions" && (
-                  <RunHistoryPanel
-                    runs={runs}
-                  />
-                )}
-            </motion.div>
+              <button
+                type="button"
+                onClick={() => setSelected(null)}
+                className="rounded-full border border-dashed border-violet-300 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-600"
+              >
+                + New agent
+              </button>
+            </div>
           )}
+
+        <AnimatePresence mode="wait">
+          {!selected &&
+            !selectedInstallation &&
+            wallets.length === 0 && (
+              <CreateAgentPanel
+                agentName={agentName}
+                selectedStrategy={selectedStrategy}
+                creating={creating}
+                onNameChange={setAgentName}
+                onStrategyChange={setSelectedStrategy}
+                onCreate={() => void handleCreateAgent()}
+              />
+            )}
+
+          {(selected ||
+            selectedInstallation) && (
+              <motion.div
+                key="agent-shell"
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <div className="mb-7 flex items-center gap-1 rounded-[16px] border border-black/10 bg-[#fffdf8]/70 p-1.5">
+                  {TABS.map((tab) => (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setActiveTab(tab.id)}
+                      className="rounded-[11px] px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em]"
+                      style={{
+                        color: activeTab === tab.id ? "#fff" : "#64748B",
+                        background:
+                          activeTab === tab.id
+                            ? "linear-gradient(135deg, #8B5CF6, #3B82F6)"
+                            : "transparent",
+                      }}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {activeTab === "agent" && (
+                  <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
+                    <div className="flex flex-col gap-4">
+                      {agentState === "running" ? (
+                        <div className="flex aspect-square flex-col items-center justify-center rounded-2xl bg-slate-950 p-6 text-center text-white">
+                          <AgentAvatar
+                            seed={
+                              selected
+                                ? selected.agent_name || selected.id
+                                : selectedInstallation?.listing.name ||
+                                selectedInstallation?.installation.id ||
+                                "installed-agent"
+                            }
+                            size={68}
+                          />
+
+                          <p className="mt-5 text-xs text-cyan-300">
+                            {RUNNING_MESSAGES[runningMessageIndex]}
+                          </p>
+                        </div>
+                      ) : selected ? (
+                        <AgentProfileCard
+                          agent={selected}
+                          onOpenWallet={() =>
+                            setWalletModalOpen(true)
+                          }
+                        />
+                      ) : selectedInstallation ? (
+                        <div className="flex aspect-square flex-col rounded-2xl border border-black/10 bg-[#fffdf8] p-6">
+                          <div className="flex items-center gap-4">
+                            <AgentAvatar
+                              seed={
+                                selectedInstallation.listing.name ||
+                                selectedInstallation.installation.id
+                              }
+                              size={56}
+                            />
+
+                            <div>
+                              <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
+                                Installed agent
+                              </p>
+
+                              <h2 className="mt-1 text-xl font-black text-slate-950">
+                                {selectedInstallation.listing.name}
+                              </h2>
+
+                              <p className="mt-1 text-xs text-slate-500">
+                                v{selectedInstallation.version.version}
+                              </p>
+                            </div>
+                          </div>
+
+                          <p className="mt-6 text-sm leading-6 text-slate-600">
+                            {selectedInstallation.listing.short_description}
+                          </p>
+
+                          <div className="mt-5 flex flex-wrap gap-2">
+                            {selectedInstallation.listing.categories
+                              .slice(0, 3)
+                              .map((category) => (
+                                <span
+                                  key={category}
+                                  className="rounded-full bg-violet-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-violet-600"
+                                >
+                                  {category}
+                                </span>
+                              ))}
+                          </div>
+
+                          <div className="mt-auto flex items-center justify-between border-t border-black/5 pt-5 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-400">
+                            <span>
+                              {selectedInstallation.installation.enabled
+                                ? "Enabled"
+                                : "Disabled"}
+                            </span>
+
+                            <span>
+                              {selectedInstallation.installation.pinned_version
+                                ? `Pinned ${selectedInstallation.installation.pinned_version}`
+                                : "Latest"}
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={
+                          agentState === "running"
+                            ? () => void handleStop()
+                            : () => void handleRun()
+                        }
+                        className="w-full rounded-2xl py-4 text-sm font-semibold text-white"
+                        style={{
+                          background:
+                            agentState === "running"
+                              ? "linear-gradient(135deg, #EF4444, #DC2626)"
+                              : `linear-gradient(135deg, ${selectedTheme?.primary || "#8B5CF6"
+                              }, ${selectedTheme?.secondary || "#3B82F6"})`,
+                        }}
+                      >
+                        {agentState === "running"
+                          ? "Stop agent"
+                          : agentState === "done"
+                            ? "Run agent again →"
+                            : "Run agent →"}
+                      </button>
+                    </div>
+
+                    <div className="flex min-w-0 flex-col gap-5">
+
+                      {selectedInstallation &&
+                        installedRunResult && (
+                          <div className="rounded-[22px] border border-black/10 bg-[#fffdf8] p-6">
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
+                                  Installed agent result
+                                </p>
+
+                                <h2 className="mt-2 text-xl font-black text-slate-950">
+                                  {
+                                    selectedInstallation
+                                      .listing.name
+                                  }
+                                </h2>
+                              </div>
+
+                              <span className="rounded-full bg-slate-950 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] text-white">
+                                {
+                                  installedRunResult
+                                    .decision.action
+                                }
+                              </span>
+                            </div>
+
+                            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+                              <StatCard
+                                label="Probability"
+                                value={`${(
+                                  installedRunResult
+                                    .decision.probability *
+                                  100
+                                ).toFixed(1)}%`}
+                              />
+
+                              <StatCard
+                                label="Edge"
+                                value={`${(
+                                  installedRunResult
+                                    .decision.edge *
+                                  100
+                                ).toFixed(1)}%`}
+                              />
+
+                              <StatCard
+                                label="Confidence"
+                                value={`${(
+                                  installedRunResult
+                                    .decision.confidence *
+                                  100
+                                ).toFixed(1)}%`}
+                              />
+                            </div>
+
+                            <p className="mt-5 text-sm leading-6 text-slate-600">
+                              {
+                                installedRunResult
+                                  .decision.reasoning
+                              }
+                            </p>
+                          </div>
+                        )}
+                      {selected ? (
+                        <ConsensusOverview
+                          consensus={
+                            latestConsensus
+                          }
+                          latestRun={
+                            latestRun
+                          }
+                          error={
+                            runError
+                          }
+                        />
+                      ) : selectedInstallation &&
+                        !installedRunResult &&
+                        !latestRun ? (
+                        <div className="rounded-[22px] border border-black/10 bg-[#fffdf8] p-6">
+                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
+                            Installed agent
+                          </p>
+
+                          <h2 className="mt-2 text-xl font-black text-slate-950">
+                            Run this agent to generate a forecast.
+                          </h2>
+                        </div>
+                      ) : null}
+
+                      {selected ? (
+                        <ProfileReasoningGrid
+                          runs={runs}
+                          consensus={
+                            latestConsensus
+                          }
+                        />
+                      ) : selectedInstallation &&
+                        latestRun ? (
+                        <div className="rounded-[22px] border border-black/10 bg-[#fffdf8] p-6">
+                          <p className="text-[9px] font-black uppercase tracking-[0.14em] text-violet-600">
+                            Research summary
+                          </p>
+
+                          <h2 className="mt-2 text-xl font-black text-slate-950">
+                            {
+                              selectedInstallation
+                                .listing.name
+                            }
+                          </h2>
+
+                          <p className="mt-5 text-sm leading-6 text-slate-600">
+                            {latestRun.research
+                              ?.summary ??
+                              latestRun.decision
+                                ?.reasoning ??
+                              "No research summary was recorded."}
+                          </p>
+
+                          {Array.isArray(
+                            latestRun.decision
+                              ?.keyFactors,
+                          ) &&
+                            latestRun.decision
+                              .keyFactors.length >
+                            0 && (
+                              <div className="mt-5 flex flex-wrap gap-2">
+                                {latestRun.decision.keyFactors.map(
+                                  (factor: string) => (
+                                    <span
+                                      key={factor}
+                                      className="rounded-full bg-violet-50 px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.1em] text-violet-600"
+                                    >
+                                      {factor}
+                                    </span>
+                                  ),
+                                )}
+                              </div>
+                            )}
+                        </div>
+                      ) : null}
+
+                      {selected ? (
+                        <ExecutionPlanCard
+                          plan={
+                            latestConsensus?.executionPlan ??
+                            latestRun?.execution_plan ??
+                            null
+                          }
+                        />
+                      ) : (
+                        <ExecutionPlanCard
+                          plan={
+                            installedRunResult?.executionPlan ??
+                            null
+                          }
+                        />
+                      )}
+                      <AgentTimeline
+                        runs={
+                          runs
+                        }
+                        consensus={
+                          latestConsensus
+                        }
+                        isRunning={
+                          agentState ===
+                          "running"
+                        }
+                      />
+                      {selected && (
+                        <AutonomyPanel
+                          config={
+                            autonomyConfig
+                          }
+                          loading={
+                            autonomyLoading
+                          }
+                          saving={
+                            autonomySaving
+                          }
+                          error={
+                            autonomyError
+                          }
+                          onSave={
+                            handleAutonomySave
+                          }
+                        />
+                      )}
+
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === "pnl" &&
+                  selected && (
+                    <PnlPanel
+                      trades={trades}
+                    />
+                  )}
+
+                {activeTab === "pnl" &&
+                  selectedInstallation && (
+                    <div className="rounded-[24px] border border-black/10 bg-[#fffdf8] p-8">
+                      <h2 className="text-xl font-black text-slate-950">
+                        No executed trades
+                      </h2>
+
+                      <p className="mt-3 text-sm leading-6 text-slate-500">
+                        This installed agent is currently running in dry-run mode.
+                      </p>
+                    </div>
+                  )}
+                {activeTab ===
+                  "transactions" && (
+                    <RunHistoryPanel
+                      runs={runs}
+                    />
+                  )}
+              </motion.div>
+            )}
         </AnimatePresence>
       </div>
 
@@ -775,5 +1222,25 @@ export default function Dashboard() {
         onClose={() => setWalletModalOpen(false)}
       />
     </main>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-[16px] border border-black/10 bg-white p-4">
+      <p className="text-[8px] font-black uppercase tracking-[0.13em] text-slate-400">
+        {label}
+      </p>
+
+      <p className="mt-2 text-lg font-black text-slate-950">
+        {value}
+      </p>
+    </div>
   );
 }

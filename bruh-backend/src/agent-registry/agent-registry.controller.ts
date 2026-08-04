@@ -344,4 +344,36 @@ export class AgentRegistryController {
                 body,
         });
     }
+
+    @UseGuards(JwtAuthGuard)
+    @Get("installations/:id/runs")
+    getInstallationRuns(
+        @Param("id")
+        installationId: string,
+
+        @Request()
+        request: {
+            user: {
+                address: string;
+            };
+        },
+
+        @Query(
+            "limit",
+            new ParseIntPipe({
+                optional: true,
+            }),
+        )
+        limit?: number,
+    ) {
+        return this.installations
+            .getInstallationRuns({
+                installationId,
+
+                userAddress:
+                    request.user.address,
+
+                limit,
+            });
+    }
 }

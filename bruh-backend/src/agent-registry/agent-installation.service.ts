@@ -747,4 +747,56 @@ export class AgentInstallationService {
                 ),
         };
     }
+
+    async getInstallationRuns(input: {
+        installationId: string;
+        userAddress: string;
+        limit?: number;
+    }) {
+        await this.getOwnedInstallation({
+            installationId:
+                input.installationId,
+
+            userAddress:
+                input.userAddress,
+        });
+
+        const safeLimit =
+            Math.min(
+                Math.max(
+                    input.limit ?? 30,
+                    1,
+                ),
+                100,
+            );
+
+        const {
+            data,
+            error,
+        } =
+            await this.supabase.db
+                .from("agent_runs")
+                .select("*")
+                .eq(
+                    "agent_installation_id",
+                    input.installationId,
+                )
+                .order(
+                    "created_at",
+                    {
+                        ascending: false,
+                    },
+                )
+                .limit(
+                    safeLimit,
+                );
+
+        if (error) {
+            throw new Error(
+                `Failed to load installation runs: ${error.message}`,
+            );
+        }
+
+        return data ?? [];
+    }
 }
