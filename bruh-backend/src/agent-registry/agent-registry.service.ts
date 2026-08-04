@@ -29,6 +29,68 @@ import type {
     PublishAgentVersionDto,
 } from "./agent-registry.types";
 
+import type {
+    AgentInstallationRecord,
+    RunInstalledAgentDto,
+} from "../agent-registry/agent-registry.types";
+
+
+import {
+    CUSTOM_AGENT_PROTOCOL_VERSION,
+    CustomAgentProtocolError,
+    validateCustomAgentResponse,
+    type AgentManifest,
+    type CustomAgentProtocolVersion,
+    type CustomAgentRunConfig,
+    type CustomAgentRunMarket,
+    type CustomAgentRunRequest,
+    type CustomAgentRunResponse,
+} from "@bruhmarket/agent-sdk";
+
+interface ResolvedRemoteAgentInput {
+    customAgentId: string;
+
+    installationId?: string;
+
+    ownerAddress: string;
+
+    manifest: AgentManifest;
+
+    endpointUrl: string;
+
+    protocolVersion:
+    CustomAgentProtocolVersion;
+
+    permissions:
+    Record<string, unknown>;
+
+    market:
+    CustomAgentRunMarket;
+
+    config?: Partial<
+        CustomAgentRunConfig
+    >;
+
+    context?: {
+        previousRunIds?: string[];
+
+        previousSummary?: string;
+
+        metadata?: Record<
+            string,
+            unknown
+        >;
+    };
+
+    wallet?: {
+        agentId: string;
+
+        address: `0x${string}`;
+
+        availableBalanceUsdc: number;
+    };
+}
+
 @Injectable()
 export class AgentRegistryService {
     constructor(

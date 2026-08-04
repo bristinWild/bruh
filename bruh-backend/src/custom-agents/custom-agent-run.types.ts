@@ -41,6 +41,8 @@ export interface CustomAgentRunnerResult {
 
     customAgentId: string;
 
+    installationId?: string;
+
     requestId: string;
 
     dryRun: true;

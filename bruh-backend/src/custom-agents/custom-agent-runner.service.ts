@@ -42,12 +42,63 @@ import {
     type ExecutionPlan,
 } from "@bruhmarket/agent-sdk/runtime";
 
+import {
+    type AgentManifest,
+    type AgentManifestPermissions,
+    type CustomAgentProtocolVersion,
+    type CustomAgentRunMarket,
+} from "@bruhmarket/agent-sdk";
+
 import type {
     AgentInstallationRecord,
     AgentListingRecord,
     AgentVersionRecord,
     RunInstalledAgentDto,
 } from "../agent-registry/agent-registry.types";
+
+interface ResolvedRemoteAgentInput {
+    customAgentId: string;
+
+    installationId?: string;
+
+    ownerAddress: string;
+
+    manifest: AgentManifest;
+
+    endpointUrl: string;
+
+    protocolVersion:
+    CustomAgentProtocolVersion;
+
+    permissions:
+    AgentManifestPermissions;
+
+    market:
+    CustomAgentRunMarket;
+
+    config?: Partial<
+        CustomAgentRunConfig
+    >;
+
+    context?: {
+        previousRunIds?: string[];
+
+        previousSummary?: string;
+
+        metadata?: Record<
+            string,
+            unknown
+        >;
+    };
+
+    wallet?: {
+        agentId: string;
+
+        address: `0x${string}`;
+
+        availableBalanceUsdc: number;
+    };
+}
 
 @Injectable()
 export class CustomAgentRunnerService {
@@ -91,22 +142,199 @@ export class CustomAgentRunnerService {
             );
         }
 
+        return this.executeResolvedAgent({
+            customAgentId:
+                agent.id,
+
+            ownerAddress:
+                input.ownerAddress,
+
+            manifest:
+                agent.manifest,
+
+            endpointUrl:
+                agent.endpoint_url,
+
+            protocolVersion:
+                agent.protocol_version,
+
+            permissions:
+                agent.manifest.permissions,
+
+            market:
+                input.dto.market,
+
+            config:
+                input.dto.config,
+
+            context:
+                input.dto.context,
+
+            wallet:
+                input.dto.wallet,
+        });
+    }
+
+    async runInstallation(input: {
+        installation:
+        AgentInstallationRecord;
+
+        listing:
+        AgentListingRecord;
+
+        version:
+        AgentVersionRecord;
+
+        ownerAddress: string;
+
+        dto:
+        RunInstalledAgentDto;
+    }): Promise<CustomAgentRunnerResult> {
+        if (!input.installation.enabled) {
+            throw new BadRequestException(
+                "This agent installation is disabled.",
+            );
+        }
+
         if (
-            !input.dto.market ||
-            !input.dto.market.id ||
-            !input.dto.market.question
+            input.version.status !==
+            "published"
+        ) {
+            throw new BadRequestException(
+                "The installed agent version is not published.",
+            );
+        }
+
+        const mergedConfiguration = {
+            ...(input.installation.configuration ?? {}),
+            ...(input.dto.config ?? {}),
+        } as Partial<CustomAgentRunConfig>;
+
+        const manifestPermissions =
+            input.version.manifest.permissions;
+
+        const installationPermissions =
+            input.installation.permissions ?? {};
+
+        const mergedPermissions:
+            AgentManifestPermissions = {
+            canResearch:
+                Boolean(
+                    manifestPermissions.canResearch,
+                ) &&
+                installationPermissions.canResearch !==
+                false,
+
+            canPurchaseResearch:
+                Boolean(
+                    manifestPermissions
+                        .canPurchaseResearch,
+                ) &&
+                installationPermissions
+                    .canPurchaseResearch !==
+                false,
+
+            canAccessHistoricalData:
+                Boolean(
+                    manifestPermissions
+                        .canAccessHistoricalData,
+                ) &&
+                installationPermissions
+                    .canAccessHistoricalData !==
+                false,
+
+            canAccessOnchainData:
+                Boolean(
+                    manifestPermissions
+                        .canAccessOnchainData,
+                ) &&
+                installationPermissions
+                    .canAccessOnchainData !==
+                false,
+
+            canUseExternalApis:
+                Boolean(
+                    manifestPermissions
+                        .canUseExternalApis,
+                ) &&
+                installationPermissions
+                    .canUseExternalApis !==
+                false,
+
+            canTrade:
+                false,
+
+            maximumTradeUsdc:
+                0,
+        };
+        return this.executeResolvedAgent({
+            customAgentId:
+                input.listing
+                    .custom_agent_id,
+
+            installationId:
+                input.installation.id,
+
+            ownerAddress:
+                input.ownerAddress,
+
+            // These values come from the
+            // immutable published version.
+            manifest:
+                input.version.manifest,
+
+            endpointUrl:
+                input.version.endpoint_url,
+
+            protocolVersion:
+                input.version
+                    .protocol_version,
+
+            permissions:
+                mergedPermissions,
+
+            market:
+                input.dto.market,
+
+            config:
+                mergedConfiguration,
+
+            context:
+                input.dto.context,
+
+            wallet:
+                input.dto.wallet,
+        });
+    }
+
+
+    private async executeResolvedAgent(
+        input: ResolvedRemoteAgentInput,
+    ): Promise<CustomAgentRunnerResult> {
+        if (
+            !input.market ||
+            !input.market.id ||
+            !input.market.question
         ) {
             throw new BadRequestException(
                 "A valid market is required.",
             );
         }
 
-        if (!input.dto.market.address) {
+        if (!input.market.address) {
             throw new BadRequestException(
                 "market.address is required for persisted custom-agent runs.",
             );
         }
 
+        if (
+            input.protocolVersion !==
+            CUSTOM_AGENT_PROTOCOL_VERSION
+        ) {
+            throw new BadRequestException(
+                `Unsupported custom-agent protocol version: ${input.protocolVersion}.`,
+            );
+        }
 
         const requestId =
             randomUUID();
@@ -124,14 +352,51 @@ export class CustomAgentRunnerService {
             );
 
         const manifestMaximumTradeUsdc =
-            agent.manifest.permissions
-                .maximumTradeUsdc ?? 0;
+            input.manifest.permissions
+                .maximumTradeUsdc ??
+            0;
 
         const config =
             this.buildConfig(
-                input.dto.config,
+                input.config,
                 manifestMaximumTradeUsdc,
             );
+
+        const requestPermissions:
+            CustomAgentRunRequest["permissions"] = {
+            canResearch:
+                input.permissions
+                    .canResearch ===
+                true,
+
+            canPurchaseResearch:
+                input.permissions
+                    .canPurchaseResearch ===
+                true,
+
+            // Remote agents never authorize
+            // wallet execution.
+            canTrade:
+                false,
+
+            canAccessHistoricalData:
+                input.permissions
+                    .canAccessHistoricalData ===
+                true,
+
+            canAccessOnchainData:
+                input.permissions
+                    .canAccessOnchainData ===
+                true,
+
+            canUseExternalApis:
+                input.permissions
+                    .canUseExternalApis ===
+                true,
+
+            maximumTradeUsdc:
+                0,
+        };
 
         const request:
             CustomAgentRunRequest = {
@@ -141,73 +406,41 @@ export class CustomAgentRunnerService {
             requestId,
 
             issuedAt:
-                issuedAt
-                    .toISOString(),
+                issuedAt.toISOString(),
 
             expiresAt:
-                expiresAt
-                    .toISOString(),
+                expiresAt.toISOString(),
 
             agent: {
                 id:
-                    agent.manifest.id,
+                    input.manifest.id,
 
                 version:
-                    agent.manifest
-                        .version,
+                    input.manifest.version,
             },
 
             market:
-                input.dto.market,
+                input.market,
 
-            permissions: {
-                canResearch:
-                    agent.manifest
-                        .permissions
-                        .canResearch,
-
-                canPurchaseResearch:
-                    agent.manifest
-                        .permissions
-                        .canPurchaseResearch,
-
-                canTrade:
-                    false,
-
-                canAccessHistoricalData:
-                    agent.manifest
-                        .permissions
-                        .canAccessHistoricalData,
-
-                canAccessOnchainData:
-                    agent.manifest
-                        .permissions
-                        .canAccessOnchainData,
-
-                canUseExternalApis:
-                    agent.manifest
-                        .permissions
-                        .canUseExternalApis,
-
-                maximumTradeUsdc:
-                    0,
-            },
+            permissions:
+                requestPermissions,
 
             config: {
                 ...config,
 
-                // Custom-agent execution remains
-                // simulation-only in this phase.
                 dryRun:
                     true,
             },
 
             context:
-                input.dto.context,
+                input.context,
 
             metadata: {
                 customAgentRegistryId:
-                    agent.id,
+                    input.customAgentId,
+
+                agentInstallationId:
+                    input.installationId,
 
                 runId,
 
@@ -225,19 +458,18 @@ export class CustomAgentRunnerService {
         const response =
             await this.callRemoteAgent({
                 endpointUrl:
-                    agent.endpoint_url,
+                    input.endpointUrl,
 
                 request,
             });
 
-
         const research =
             this.normalizeResearch({
                 profileId:
-                    agent.manifest.id,
+                    input.manifest.id,
 
                 marketId:
-                    input.dto.market.id,
+                    input.market.id,
 
                 response,
             });
@@ -247,38 +479,47 @@ export class CustomAgentRunnerService {
                 response,
             );
 
-        const normalizedMarket: AgentMarket = {
-            id: input.dto.market.id,
-            question: input.dto.market.question,
-            categories: [],
+        const normalizedMarket:
+            AgentMarket = {
+            id:
+                input.market.id,
 
-            yesPrice: input.dto.market.yesPrice,
-            noPrice: input.dto.market.noPrice,
+            question:
+                input.market.question,
+
+            categories:
+                [],
+
+            yesPrice:
+                input.market.yesPrice,
+
+            noPrice:
+                input.market.noPrice,
 
             description:
-                input.dto.market.description,
+                input.market.description,
 
             resolutionCriteria:
-                input.dto.market.resolutionCriteria,
+                input.market
+                    .resolutionCriteria,
 
             closesAt:
-                input.dto.market.closesAt,
+                input.market.closesAt,
         };
 
         const profile =
             this.buildCustomProfile({
                 agentId:
-                    agent.manifest.id,
+                    input.manifest.id,
 
                 version:
-                    agent.manifest.version,
+                    input.manifest.version,
 
                 name:
-                    agent.manifest.name,
+                    input.manifest.name,
 
                 config,
             });
-
 
         const decision =
             buildAgentDecision({
@@ -309,7 +550,7 @@ export class CustomAgentRunnerService {
                         config.minimumConfidence,
 
                     availableBalanceUsdc:
-                        input.dto.wallet
+                        input.wallet
                             ?.availableBalanceUsdc ??
                         0,
 
@@ -321,15 +562,13 @@ export class CustomAgentRunnerService {
                 },
             });
 
-
         const executionPlan =
             buildExecutionPlan({
                 runId,
 
                 agentId:
-                    input.dto.wallet
-                        ?.agentId ??
-                    agent.manifest.id,
+                    input.wallet?.agentId ??
+                    input.manifest.id,
 
                 profile,
 
@@ -341,19 +580,20 @@ export class CustomAgentRunnerService {
                 decision,
 
                 walletAddress:
-                    input.dto.wallet
-                        ?.address,
+                    input.wallet?.address,
 
                 network:
-                    input.dto.market
-                        .network,
+                    input.market.network,
 
                 expiresInSeconds:
                     300,
 
                 metadata: {
                     customAgentId:
-                        agent.id,
+                        input.customAgentId,
+
+                    installationId:
+                        input.installationId,
 
                     requestId,
 
@@ -364,30 +604,34 @@ export class CustomAgentRunnerService {
                         input.ownerAddress,
 
                     marketAddress:
-                        input.dto.market
-                            .address,
+                        input.market.address,
                 },
             });
+
         const durationMs =
             Date.now() -
             startedAt;
+
         await this.persistRun({
             runId,
 
             customAgentId:
-                agent.id,
+                input.customAgentId,
+
+            installationId:
+                input.installationId,
 
             ownerAddress:
                 input.ownerAddress,
 
             profileId:
-                agent.manifest.id,
+                input.manifest.id,
 
             profileVersion:
-                agent.manifest.version,
+                input.manifest.version,
 
             market:
-                input.dto.market,
+                input.market,
 
             requestId,
 
@@ -408,7 +652,10 @@ export class CustomAgentRunnerService {
             runId,
 
             customAgentId:
-                agent.id,
+                input.customAgentId,
+
+            installationId:
+                input.installationId,
 
             requestId,
 
@@ -431,94 +678,12 @@ export class CustomAgentRunnerService {
         };
     }
 
-    async runInstallation(input: {
-        installation:
-        AgentInstallationRecord;
-
-        listing:
-        AgentListingRecord;
-
-        version:
-        AgentVersionRecord;
-
-        ownerAddress: string;
-
-        dto:
-        RunInstalledAgentDto;
-    }): Promise<CustomAgentRunnerResult> {
-        if (!input.installation.enabled) {
-            throw new BadRequestException(
-                "This agent installation is disabled.",
-            );
-        }
-
-        if (
-            !input.dto.market ||
-            !input.dto.market.id ||
-            !input.dto.market.question
-        ) {
-            throw new BadRequestException(
-                "A valid market is required.",
-            );
-        }
-
-        if (!input.dto.market.address) {
-            throw new BadRequestException(
-                "market.address is required for installed-agent runs.",
-            );
-        }
-
-        const customAgent =
-            await this.customAgents.getById(
-                input.listing.custom_agent_id,
-            );
-
-        if (
-            customAgent.verification_status !==
-            "verified"
-        ) {
-            throw new BadRequestException(
-                "The custom agent backing this installation is not verified.",
-            );
-        }
-
-        if (!customAgent.active) {
-            throw new BadRequestException(
-                "The custom agent backing this installation is inactive.",
-            );
-        }
-
-        return this.run({
-            customAgentId:
-                customAgent.id,
-
-            ownerAddress:
-                customAgent.owner_address,
-
-            dto: {
-                market:
-                    input.dto.market,
-
-                config: {
-                    ...input.installation
-                        .configuration,
-
-                    ...input.dto.config,
-                },
-
-                context:
-                    input.dto.context,
-
-                wallet:
-                    input.dto.wallet,
-            },
-        });
-    }
-
     private async persistRun(input: {
         runId: string;
 
         customAgentId: string;
+
+        installationId?: string;
 
         ownerAddress: string;
 
@@ -527,7 +692,7 @@ export class CustomAgentRunnerService {
         profileVersion: string;
 
         market:
-        RunCustomAgentDto["market"];
+        CustomAgentRunMarket;
 
         requestId: string;
 
@@ -567,6 +732,10 @@ export class CustomAgentRunnerService {
 
                     custom_agent_id:
                         input.customAgentId,
+
+                    agent_installation_id:
+                        input.installationId ??
+                        null,
 
                     run_source:
                         "custom",
@@ -633,6 +802,9 @@ export class CustomAgentRunnerService {
                         remoteMetadata:
                             input.response
                                 .metadata,
+
+                        installationId:
+                            input.installationId,
                     },
 
                     started_at:
@@ -1052,7 +1224,10 @@ export class CustomAgentRunnerService {
 
 
     private buildConfig(
-        config: RunCustomAgentDto["config"],
+        config:
+            Partial<CustomAgentRunConfig>
+            | undefined,
+
         manifestMaximumTradeUsdc = 0,
     ): CustomAgentRunConfig {
         const safeMaximumTradeUsdc =
