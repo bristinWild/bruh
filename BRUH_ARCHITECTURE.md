@@ -418,6 +418,17 @@ Future integrations
 
 ## Phase 13
 
+### ✅ Agent Registry
+
+- [x] Agent Listings
+- [x] Agent Versions
+- [x] Agent Installation
+- [x] Installation Upgrades
+- [x] Installation Enable / Disable
+- [x] Installed Agent Execution
+- [x] Marketplace UI
+- [x] Agent Details Page
+
 - [ ] Marketplace
 - [ ] Agent Installation
 - [ ] Versioning
