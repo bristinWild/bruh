@@ -637,9 +637,13 @@ export default function Dashboard() {
             },
           );
 
+        setRunStage("forecast");
+
         setInstalledRunResult(
           result,
         );
+
+        setRunStage("execution");
 
         const nextRuns =
           await getInstalledAgentRuns(
@@ -647,7 +651,7 @@ export default function Dashboard() {
             installationId,
             30,
           );
-
+        setRunStage("done");
         setRuns(nextRuns);
 
         setLatestRun(
@@ -1086,9 +1090,9 @@ export default function Dashboard() {
                         }}
                       >
                         {agentState === "running"
-                          ? "Stop agent"
+                          ? "Running..."
                           : agentState === "done"
-                            ? "Run agent again →"
+                            ? "Run Again →"
                             : "Run agent →"}
                       </button>
                     </div>
@@ -1178,16 +1182,10 @@ export default function Dashboard() {
                         />
                       )}
                       <AgentTimeline
-                        runs={
-                          runs
-                        }
-                        consensus={
-                          latestConsensus
-                        }
-                        isRunning={
-                          agentState ===
-                          "running"
-                        }
+                        runs={runs}
+                        consensus={latestConsensus}
+                        isRunning={agentState === "running"}
+                        runStage={runStage}
                       />
                       {selected && (
                         <AutonomyPanel
