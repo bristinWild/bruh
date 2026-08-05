@@ -29,6 +29,10 @@ import {
   AgentRegistryModule,
 } from "./agent-registry/agent-registry.module";
 
+import {
+  MarketsModule,
+} from "./markets/markets.module";
+
 
 @Module({
   imports: [
@@ -44,7 +48,7 @@ import {
     AutonomyModule,
     CustomAgentsModule,
     AgentRegistryModule,
-
+    MarketsModule,
   ],
   controllers: [AuthController, WalletsController],
   providers: [
