@@ -83,9 +83,6 @@ function getConfig() {
                 ssr:
                     false,
 
-                multiInjectedProviderDiscovery:
-                    false,
-
                 wallets: [
                     {
                         groupName:

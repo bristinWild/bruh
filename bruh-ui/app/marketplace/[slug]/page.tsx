@@ -407,6 +407,7 @@ export default function AgentDetailsPage() {
         setError(null);
         setRunResult(null);
 
+
         try {
             const result =
                 await runInstalledAgent(
