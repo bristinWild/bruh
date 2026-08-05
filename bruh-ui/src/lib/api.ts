@@ -486,10 +486,15 @@ export async function getAgentAutonomy(
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(
-            data?.message ??
-            `Failed to load autonomy configuration with status ${response.status}`,
-        );
+        const payload =
+            await response.json();
+
+        throw {
+            code:
+                payload.code,
+            message:
+                payload.message,
+        };
     }
 
     return data as AgentAutonomyConfig;
@@ -515,12 +520,16 @@ export async function updateAgentAutonomy(
     const data = await response.json();
 
     if (!response.ok) {
-        throw new Error(
-            data?.message ??
-            `Failed to update autonomy configuration with status ${response.status}`,
-        );
-    }
+        const payload =
+            await response.json();
 
+        throw {
+            code:
+                payload.code,
+            message:
+                payload.message,
+        };
+    }
     return data;
 }
 
@@ -873,4 +882,45 @@ export async function getInstalledAgentRuns(
     return Array.isArray(data)
         ? data as AgentRun[]
         : [];
+}
+
+export function getApiErrorMessage(error: unknown): string {
+    if (!(error instanceof Error)) {
+        return "Something went wrong.";
+    }
+
+    const message = error.message;
+
+    if (message.includes("AGENT_OFFLINE")) {
+        return "The agent is currently offline.";
+    }
+
+    if (message.includes("AGENT_TIMEOUT")) {
+        return "The agent took too long to respond.";
+    }
+
+    if (message.includes("AGENT_VERSION_MISMATCH")) {
+        return "The installed agent version doesn't match the deployed version.";
+    }
+
+    if (message.includes("INVALID_PROTOCOL")) {
+        return "The agent returned an invalid protocol response.";
+    }
+
+    if (message.includes("INSTALLATION_DISABLED")) {
+        return "This agent is currently disabled.";
+    }
+
+    if (
+        message.includes("Failed to fetch") ||
+        message.includes("NetworkError")
+    ) {
+        return "Unable to reach the server.";
+    }
+
+    if (message.includes("500")) {
+        return "The server encountered an unexpected error.";
+    }
+
+    return message;
 }

@@ -36,6 +36,7 @@ import {
   type InstalledAgent,
   type InstalledAgentRunResult,
   getInstalledAgentRuns,
+  getApiErrorMessage,
 } from "@/src/lib/api";
 import ConsensusOverview from "@/components/dashboard/ConsensusOverview";
 import ProfileReasoningGrid from "@/components/dashboard/ProfileReasoningGrid";
@@ -49,7 +50,18 @@ import {
   type RunnableMarket,
 } from "@/src/lib/runnableMarkets";
 
-
+interface Props {
+  state:
+  | "idle"
+  | "running"
+  | "done";
+  stage:
+  | "idle"
+  | "research"
+  | "forecast"
+  | "execution"
+  | "done";
+}
 
 
 export default function Dashboard() {
@@ -129,7 +141,16 @@ export default function Dashboard() {
   ] =
     useState<string | null>(null);
 
-
+  const [
+    runStage,
+    setRunStage,
+  ] = useState<
+    | "idle"
+    | "research"
+    | "forecast"
+    | "execution"
+    | "done"
+  >("idle");
 
   useEffect(() => {
     const savedToken =
@@ -594,7 +615,7 @@ export default function Dashboard() {
     ) {
       return;
     }
-
+    setRunStage("research");
     setAgentState("running");
     setRunError(null);
     setLatestConsensus(null);
@@ -671,11 +692,7 @@ export default function Dashboard() {
         error,
       );
 
-      setRunError(
-        error instanceof Error
-          ? error.message
-          : "Agent run failed.",
-      );
+      setRunError(getApiErrorMessage(error));
 
       setAgentState("idle");
     } finally {
@@ -1048,6 +1065,7 @@ export default function Dashboard() {
                         )}
                       </div>
 
+
                       <button
                         type="button"
                         onClick={
@@ -1253,3 +1271,5 @@ function StatCard({
     </div>
   );
 }
+
+
