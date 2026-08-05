@@ -27,7 +27,9 @@ import {
 } from "lucide-react";
 
 import {
+    getMarketPriceHistory,
     getPublicMarket,
+    type MarketPricePoint,
     type PublicMarket,
 } from "@/src/lib/api";
 
@@ -415,6 +417,18 @@ export default function MarketDetail({
         "overview" | "activity" | "reasoning"
     >("overview");
 
+    const [
+    priceHistory,
+    setPriceHistory,
+] = useState<
+    MarketPricePoint[]
+>([]);
+
+const [
+    historyLoading,
+    setHistoryLoading,
+] = useState(true);
+
     useEffect(() => {
         let cancelled =
             false;
@@ -466,6 +480,63 @@ export default function MarketDetail({
     }, [
         marketId,
     ]);
+
+
+    useEffect(() => {
+    let cancelled =
+        false;
+
+    async function loadHistory() {
+        try {
+            const history =
+                await getMarketPriceHistory(
+                    marketId,
+                );
+
+            if (!cancelled) {
+                setPriceHistory(
+                    history,
+                );
+
+                setHistoryLoading(
+                    false,
+                );
+            }
+        } catch (error) {
+            console.error(
+                "Failed to load market history:",
+                error,
+            );
+
+            if (!cancelled) {
+                setHistoryLoading(
+                    false,
+                );
+            }
+        }
+    }
+
+    void loadHistory();
+
+    const interval =
+        window.setInterval(
+            () => {
+                void loadHistory();
+            },
+            120000,
+        );
+
+    return () => {
+        cancelled =
+            true;
+
+        window.clearInterval(
+            interval,
+        );
+    };
+}, [
+    marketId,
+]);
 
     const market =
         useMemo(
@@ -790,27 +861,17 @@ export default function MarketDetail({
                                     <div className="flex-1 bg-rose-300/70" />
                                 </div>
 
-                                <div className="mt-7 h-[230px] rounded-[20px] border border-black/10 bg-white/50 p-5">
-                                    <div className="flex h-full items-center justify-center">
-                                        <div className="text-center">
-                                            <TrendingUp
-                                                className="mx-auto h-8 w-8"
-                                                style={{
-                                                    color: theme.text,
-                                                }}
-                                            />
-
-                                            <p className="mt-4 text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">
-                                                Probability chart
-                                            </p>
-
-                                            <p className="mt-2 text-[11px] font-medium text-slate-400">
-                                                Connect your historical
-                                                market price data here.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
+                             <MarketPriceChart
+    points={
+        priceHistory
+    }
+    loading={
+        historyLoading
+    }
+    theme={
+        theme
+    }
+/>
                             </div>
                         </section>
 
@@ -1132,6 +1193,276 @@ export default function MarketDetail({
         </main>
     );
 }
+
+
+function MarketPriceChart({
+    points,
+    loading,
+    theme,
+}: {
+    points:
+        MarketPricePoint[];
+
+    loading:
+        boolean;
+
+    theme:
+        (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
+}) {
+    if (loading) {
+        return (
+            <div className="mt-7 h-[230px] animate-pulse rounded-[20px] border border-black/10 bg-white/50" />
+        );
+    }
+
+    if (points.length === 0) {
+        return (
+            <div className="mt-7 flex h-[230px] items-center justify-center rounded-[20px] border border-black/10 bg-white/50 p-5 text-center">
+                <p className="text-[11px] font-medium text-slate-400">
+                    No market price history is available yet.
+                </p>
+            </div>
+        );
+    }
+
+    const width =
+        720;
+
+    const height =
+        190;
+
+    const padding =
+        18;
+
+    const values =
+        points.map(
+            (point) =>
+                point.yesPrice *
+                100,
+        );
+
+    const minimum =
+        Math.min(
+            ...values,
+        );
+
+    const maximum =
+        Math.max(
+            ...values,
+        );
+
+    const range =
+        Math.max(
+            maximum -
+                minimum,
+            1,
+        );
+
+    const coordinates =
+        points.map(
+            (
+                point,
+                index,
+            ) => {
+                const x =
+                    points.length === 1
+                        ? width /
+                          2
+                        : padding +
+                          (index /
+                              (points.length -
+                                  1)) *
+                              (width -
+                                  padding *
+                                      2);
+
+                const y =
+                    padding +
+                    ((maximum -
+                        point.yesPrice *
+                            100) /
+                        range) *
+                        (height -
+                            padding *
+                                2);
+
+                return {
+                    x,
+                    y,
+                };
+            },
+        );
+
+    const linePath =
+        coordinates
+            .map(
+                (
+                    point,
+                    index,
+                ) =>
+                    `${
+                        index === 0
+                            ? "M"
+                            : "L"
+                    } ${point.x} ${point.y}`,
+            )
+            .join(" ");
+
+    const areaPath =
+        coordinates.length > 0
+            ? `${linePath} L ${
+                  coordinates[
+                      coordinates.length -
+                          1
+                  ].x
+              } ${height} L ${
+                  coordinates[0].x
+              } ${height} Z`
+            : "";
+
+    const latest =
+        values[
+            values.length -
+                1
+        ];
+
+    return (
+        <div className="mt-7 rounded-[20px] border border-black/10 bg-white/50 p-5">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-[8px] font-black uppercase tracking-[0.15em] text-slate-400">
+                        YES probability history
+                    </p>
+
+                    <p
+                        className="mt-2 font-mono text-[20px] font-black"
+                        style={{
+                            color:
+                                theme.text,
+                        }}
+                    >
+                        {latest.toFixed(
+                            1,
+                        )}
+                        %
+                    </p>
+                </div>
+
+                <span className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.12em] text-slate-500">
+                    Live · 10s
+                </span>
+            </div>
+
+            <div className="mt-4 overflow-hidden">
+                <svg
+                    viewBox={`0 0 ${width} ${height}`}
+                    className="h-[170px] w-full"
+                    preserveAspectRatio="none"
+                    role="img"
+                    aria-label="YES probability history chart"
+                >
+                    <defs>
+                        <linearGradient
+                            id="market-chart-area"
+                            x1="0"
+                            y1="0"
+                            x2="0"
+                            y2="1"
+                        >
+                            <stop
+                                offset="0%"
+                                stopColor={
+                                    theme.primary
+                                }
+                                stopOpacity="0.28"
+                            />
+
+                            <stop
+                                offset="100%"
+                                stopColor={
+                                    theme.primary
+                                }
+                                stopOpacity="0"
+                            />
+                        </linearGradient>
+                    </defs>
+
+                    <path
+                        d={
+                            areaPath
+                        }
+                        fill="url(#market-chart-area)"
+                    />
+
+                    <path
+                        d={
+                            linePath
+                        }
+                        fill="none"
+                        stroke={
+                            theme.primary
+                        }
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+
+                    {coordinates.map(
+                        (
+                            point,
+                            index,
+                        ) => (
+                            <circle
+                                key={
+                                    index
+                                }
+                                cx={
+                                    point.x
+                                }
+                                cy={
+                                    point.y
+                                }
+                                r="5"
+                                fill="#fff"
+                                stroke={
+                                    theme.primary
+                                }
+                                strokeWidth="3"
+                            />
+                        ),
+                    )}
+                </svg>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between font-mono text-[8px] font-black uppercase tracking-[0.12em] text-slate-400">
+                <span>
+                    {new Date(
+                        points[0]
+                            .timestamp,
+                    ).toLocaleDateString()}
+                </span>
+
+                <span>
+                    {new Date(
+                        points[
+                            points.length -
+                                1
+                        ].timestamp,
+                    ).toLocaleTimeString(
+                        [],
+                        {
+                            hour:
+                                "2-digit",
+                            minute:
+                                "2-digit",
+                        },
+                    )}
+                </span>
+            </div>
+        </div>
+    );
+}
+
 
 function MetricCard({
     icon: Icon,

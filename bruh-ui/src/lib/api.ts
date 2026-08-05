@@ -294,6 +294,18 @@ export interface PublicMarket {
     network: "eip155:5042002";
 }
 
+export interface MarketPricePoint {
+    blockNumber: number;
+    timestamp: string;
+    yesPrice: number;
+    noPrice: number;
+    eventType:
+    | "BUY"
+    | "SELL"
+    | "INITIAL"
+    | "CURRENT";
+}
+
 // export interface InstalledAgentRunResult {
 //     runId: string;
 //     customAgentId: string;
@@ -983,4 +995,28 @@ export async function getPublicMarket(
     return readApiResponse<PublicMarket>(
         response,
     );
+}
+
+export async function getMarketPriceHistory(
+    address: string,
+): Promise<MarketPricePoint[]> {
+    const response =
+        await fetch(
+            `${API_URL}/markets/${address}/history`,
+            {
+                cache:
+                    "no-store",
+            },
+        );
+
+    const data =
+        await readApiResponse<unknown>(
+            response,
+        );
+
+    return Array.isArray(data)
+        ? (
+            data as MarketPricePoint[]
+        )
+        : [];
 }
