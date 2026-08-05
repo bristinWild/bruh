@@ -7,6 +7,7 @@ interface AgentTimelineProps {
     runs: AgentRun[];
     consensus: ConsensusResult | null;
     isRunning: boolean;
+    runStage: RunStage;
 }
 
 interface TimelineEvent {
@@ -21,16 +22,25 @@ interface TimelineEvent {
     | "failed";
 }
 
+type RunStage =
+    | "idle"
+    | "research"
+    | "forecast"
+    | "execution"
+    | "done";
+
 export default function AgentTimeline({
     runs,
     consensus,
     isRunning,
+    runStage,
 }: AgentTimelineProps) {
     const events =
         buildTimelineEvents({
             runs,
             consensus,
             isRunning,
+            runStage,
         });
 
     return (
@@ -125,23 +135,76 @@ function buildTimelineEvents({
     runs,
     consensus,
     isRunning,
+    runStage,
 }: {
     runs: AgentRun[];
     consensus: ConsensusResult | null;
     isRunning: boolean;
+    runStage: RunStage;
 }): TimelineEvent[] {
     const events: TimelineEvent[] = [];
 
     if (isRunning) {
+        const stageContent: Record<
+            Exclude<
+                RunStage,
+                "idle" | "done"
+            >,
+            {
+                label: string;
+                detail: string;
+            }
+        > = {
+            research: {
+                label:
+                    "Researching market",
+                detail:
+                    "Collecting and evaluating available market evidence.",
+            },
+
+            forecast: {
+                label:
+                    "Generating forecast",
+                detail:
+                    "Calculating probability, confidence, and directional edge.",
+            },
+
+            execution: {
+                label:
+                    "Building execution plan",
+                detail:
+                    "Applying position sizing and runtime risk checks.",
+            },
+        };
+
+        const currentStage =
+            runStage === "research" ||
+                runStage === "forecast" ||
+                runStage === "execution"
+                ? stageContent[
+                runStage
+                ]
+                : {
+                    label:
+                        "Agent runtime active",
+                    detail:
+                        "The agent is evaluating the selected market.",
+                };
+
         events.push({
-            id: "runtime-active",
-            label: "Agent runtime active",
+            id:
+                "runtime-active",
+
+            label:
+                currentStage.label,
+
             detail:
-                "The agent is researching and evaluating the selected market.",
-            status: "active",
+                currentStage.detail,
+
+            status:
+                "active",
         });
     }
-
     const currentMemberRunIds =
         consensus?.members.map(
             (member) => member.runId,

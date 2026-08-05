@@ -50,19 +50,6 @@ import {
   type RunnableMarket,
 } from "@/src/lib/runnableMarkets";
 
-interface Props {
-  state:
-  | "idle"
-  | "running"
-  | "done";
-  stage:
-  | "idle"
-  | "research"
-  | "forecast"
-  | "execution"
-  | "done";
-}
-
 
 export default function Dashboard() {
   const [token, setToken] = useState<string | null>(null);
@@ -542,6 +529,8 @@ export default function Dashboard() {
       setAgentName("");
       setSelectedStrategy(null);
       setAgentState("idle");
+      setRunStage("idle");
+
     } finally {
       setCreating(false);
     }
@@ -606,6 +595,12 @@ export default function Dashboard() {
     );
   }
 
+  function resetRunStage() {
+    window.setTimeout(() => {
+      setRunStage("idle");
+    }, 1500);
+  }
+
   async function handleRun() {
     if (
       !token ||
@@ -627,6 +622,7 @@ export default function Dashboard() {
           selectedInstallation
             .installation.id;
 
+        setRunStage("research");
         const result =
           await runInstalledAgent(
             token,
@@ -637,11 +633,11 @@ export default function Dashboard() {
             },
           );
 
-        setRunStage("forecast");
 
         setInstalledRunResult(
           result,
         );
+        setRunStage("forecast");
 
         setRunStage("execution");
 
@@ -651,7 +647,6 @@ export default function Dashboard() {
             installationId,
             30,
           );
-        setRunStage("done");
         setRuns(nextRuns);
 
         setLatestRun(
@@ -659,7 +654,9 @@ export default function Dashboard() {
           null,
         );
 
+        setRunStage("done");
         setAgentState("done");
+        resetRunStage();
         return;
       }
 
@@ -671,6 +668,8 @@ export default function Dashboard() {
         "active",
       );
 
+      setRunStage("research");
+
       const response =
         await runAgent(
           token,
@@ -679,17 +678,22 @@ export default function Dashboard() {
           false,
         );
 
+      setRunStage("forecast");
+
       setLatestConsensus(
         response.consensus ??
         null,
       );
 
+      setRunStage("execution");
       await loadRuns(
         token,
         selected.id,
       );
-
+      setRunStage("done");
       setAgentState("done");
+      resetRunStage();
+
     } catch (error) {
       console.error(
         "Failed to run agent:",
@@ -699,6 +703,7 @@ export default function Dashboard() {
       setRunError(getApiErrorMessage(error));
 
       setAgentState("idle");
+      setRunStage("idle");
     } finally {
       if (selected) {
         try {
@@ -721,6 +726,7 @@ export default function Dashboard() {
     }
 
     setAgentState("idle");
+    setRunStage("idle");
   }
 
   function selectWallet(
@@ -730,6 +736,7 @@ export default function Dashboard() {
     setSelectedInstallation(null);
 
     setAgentState("idle");
+    setRunStage("idle");
     setActiveTab("agent");
 
     setLatestConsensus(null);
@@ -748,6 +755,7 @@ export default function Dashboard() {
     setSelectedInstallation(item);
 
     setAgentState("idle");
+    setRunStage("idle");
     setActiveTab("agent");
 
     setLatestConsensus(null);
@@ -807,7 +815,8 @@ export default function Dashboard() {
                   key={wallet.id}
                   type="button"
                   onClick={() => void selectWallet(wallet)}
-                  className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em]"
+                  disabled={agentState === "running"}
+                  className="flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <AgentAvatar seed={wallet.agent_name || wallet.id} size={20} />
                   {wallet.agent_name || wallet.strategy}
@@ -831,6 +840,7 @@ export default function Dashboard() {
                         onClick={() =>
                           selectInstalledAgent(item)
                         }
+                        disabled={agentState === "running"}
                         className={`flex items-center gap-2 rounded-full border px-3 py-2 text-[9px] font-black uppercase tracking-[0.12em] transition ${active
                           ? "border-violet-500 bg-violet-500 text-white"
                           : "border-violet-200 bg-violet-50 text-violet-700"
@@ -858,6 +868,7 @@ export default function Dashboard() {
               <button
                 type="button"
                 onClick={() => setSelected(null)}
+                disabled={agentState === "running"}
                 className="rounded-full border border-dashed border-violet-300 px-4 py-2.5 text-[9px] font-black uppercase tracking-[0.12em] text-violet-600"
               >
                 + New agent
@@ -892,9 +903,13 @@ export default function Dashboard() {
                       key={tab.id}
                       type="button"
                       onClick={() => setActiveTab(tab.id)}
-                      className="rounded-[11px] px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em]"
+                      disabled={agentState === "running"}
+                      className="rounded-[11px] px-5 py-3 text-[9px] font-black uppercase tracking-[0.14em] disabled:cursor-not-allowed disabled:opacity-60"
                       style={{
-                        color: activeTab === tab.id ? "#fff" : "#64748B",
+                        color:
+                          activeTab === tab.id
+                            ? "#fff"
+                            : "#64748B",
                         background:
                           activeTab === tab.id
                             ? "linear-gradient(135deg, #8B5CF6, #3B82F6)"
@@ -910,21 +925,130 @@ export default function Dashboard() {
                   <div className="grid items-start gap-6 lg:grid-cols-[340px_minmax(0,1fr)]">
                     <div className="flex flex-col gap-4">
                       {agentState === "running" ? (
-                        <div className="flex aspect-square flex-col items-center justify-center rounded-2xl bg-slate-950 p-6 text-center text-white">
-                          <AgentAvatar
-                            seed={
-                              selected
-                                ? selected.agent_name || selected.id
-                                : selectedInstallation?.listing.name ||
-                                selectedInstallation?.installation.id ||
-                                "installed-agent"
-                            }
-                            size={68}
-                          />
+                        <div className="flex aspect-square flex-col rounded-2xl border border-slate-800 bg-slate-950 p-6 text-white shadow-xl">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <AgentAvatar
+                                seed={
+                                  selected
+                                    ? selected.agent_name ||
+                                    selected.id
+                                    : selectedInstallation
+                                      ?.listing.name ||
+                                    selectedInstallation
+                                      ?.installation.id ||
+                                    "installed-agent"
+                                }
+                                size={52}
+                              />
 
-                          <p className="mt-5 text-xs text-cyan-300">
-                            {RUNNING_MESSAGES[runningMessageIndex]}
-                          </p>
+                              <div>
+                                <p className="text-[8px] font-black uppercase tracking-[0.16em] text-cyan-300">
+                                  Agent running
+                                </p>
+
+                                <h2 className="mt-1 text-lg font-black text-white">
+                                  {selected
+                                    ? selected.agent_name ||
+                                    selected.strategy
+                                    : selectedInstallation
+                                      ?.listing.name}
+                                </h2>
+                              </div>
+                            </div>
+
+                            <span className="flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/10 px-3 py-2 text-[8px] font-black uppercase tracking-[0.12em] text-cyan-300">
+                              <span className="h-2 w-2 animate-pulse rounded-full bg-cyan-300" />
+
+                              Live
+                            </span>
+                          </div>
+
+                          <div className="mt-7 rounded-[16px] border border-white/10 bg-white/5 p-4">
+                            <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                              Current stage
+                            </p>
+
+                            <p className="mt-2 text-sm font-black text-white">
+                              {runStage === "research"
+                                ? "Researching market"
+                                : runStage === "forecast"
+                                  ? "Generating forecast"
+                                  : runStage === "execution"
+                                    ? "Building execution plan"
+                                    : "Finalizing run"}
+                            </p>
+
+                            <p className="mt-2 text-xs leading-5 text-slate-400">
+                              {RUNNING_MESSAGES[
+                                runningMessageIndex
+                              ]}
+                            </p>
+                          </div>
+
+                          {selectedMarket && (
+                            <div className="mt-4 rounded-[16px] border border-white/10 bg-white/5 p-4">
+                              <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-400">
+                                Forecast market
+                              </p>
+
+                              <p className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-slate-200">
+                                {selectedMarket.question}
+                              </p>
+
+                              <div className="mt-4 flex items-center justify-between">
+                                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-emerald-300">
+                                  YES{" "}
+                                  {(
+                                    selectedMarket.yesPrice *
+                                    100
+                                  ).toFixed(1)}
+                                  %
+                                </span>
+
+                                <span className="text-[9px] font-black uppercase tracking-[0.12em] text-red-300">
+                                  NO{" "}
+                                  {(
+                                    selectedMarket.noPrice *
+                                    100
+                                  ).toFixed(1)}
+                                  %
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="mt-auto pt-6">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                              <motion.div
+                                className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-500"
+                                initial={{
+                                  width: "10%",
+                                }}
+                                animate={{
+                                  width:
+                                    runStage === "research"
+                                      ? "35%"
+                                      : runStage ===
+                                        "forecast"
+                                        ? "65%"
+                                        : runStage ===
+                                          "execution"
+                                          ? "90%"
+                                          : "100%",
+                                }}
+                                transition={{
+                                  duration: 0.4,
+                                }}
+                              />
+                            </div>
+
+                            <div className="mt-3 flex justify-between text-[7px] font-black uppercase tracking-[0.12em] text-slate-500">
+                              <span>Research</span>
+                              <span>Forecast</span>
+                              <span>Plan</span>
+                            </div>
+                          </div>
                         </div>
                       ) : selected ? (
                         <AgentProfileCard
@@ -1072,21 +1196,21 @@ export default function Dashboard() {
 
                       <button
                         type="button"
-                        onClick={
-                          agentState === "running"
-                            ? () => void handleStop()
-                            : () => void handleRun()
-                        }
+                        onClick={() => void handleRun()}
                         disabled={
+                          agentState === "running" ||
                           !selectedMarket
                         }
-                        className="w-full rounded-2xl py-4 text-sm font-semibold text-white"
+                        className="w-full rounded-2xl py-4 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
                         style={{
                           background:
                             agentState === "running"
-                              ? "linear-gradient(135deg, #EF4444, #DC2626)"
-                              : `linear-gradient(135deg, ${selectedTheme?.primary || "#8B5CF6"
-                              }, ${selectedTheme?.secondary || "#3B82F6"})`,
+                              ? "linear-gradient(135deg, #64748B, #475569)"
+                              : `linear-gradient(135deg, ${selectedTheme?.primary ||
+                              "#8B5CF6"
+                              }, ${selectedTheme?.secondary ||
+                              "#3B82F6"
+                              })`,
                         }}
                       >
                         {agentState === "running"
@@ -1184,8 +1308,13 @@ export default function Dashboard() {
                       <AgentTimeline
                         runs={runs}
                         consensus={latestConsensus}
-                        isRunning={agentState === "running"}
-                        runStage={runStage}
+                        isRunning={
+                          agentState ===
+                          "running"
+                        }
+                        runStage={
+                          runStage
+                        }
                       />
                       {selected && (
                         <AutonomyPanel
