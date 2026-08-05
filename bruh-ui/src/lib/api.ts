@@ -269,6 +269,31 @@ export interface RunInstalledAgentInput {
     };
 }
 
+export interface PublicMarket {
+    id: string;
+    address: `0x${string}`;
+    question: string;
+    closeTime: string;
+    closeTimeUnix: number;
+    createdAt: string;
+    creator: `0x${string}`;
+    oracle: `0x${string}`;
+    outcome:
+    | "UNRESOLVED"
+    | "YES"
+    | "NO"
+    | "INVALID";
+    yesPrice: number;
+    noPrice: number;
+    collateralUsdc: number;
+    totalSharesYes: number;
+    totalSharesNo: number;
+    feeBps: number;
+    open: boolean;
+    resolved: boolean;
+    network: "eip155:5042002";
+}
+
 // export interface InstalledAgentRunResult {
 //     runId: string;
 //     customAgentId: string;
@@ -923,4 +948,39 @@ export function getApiErrorMessage(error: unknown): string {
     }
 
     return message;
+}
+
+export async function getPublicMarkets(
+    limit = 100,
+): Promise<PublicMarket[]> {
+    const response = await fetch(
+        `${API_URL}/markets?limit=${limit}`,
+        {
+            cache: "no-store",
+        },
+    );
+
+    const data =
+        await readApiResponse<unknown>(
+            response,
+        );
+
+    return Array.isArray(data)
+        ? (data as PublicMarket[])
+        : [];
+}
+
+export async function getPublicMarket(
+    address: string,
+): Promise<PublicMarket> {
+    const response = await fetch(
+        `${API_URL}/markets/${address}`,
+        {
+            cache: "no-store",
+        },
+    );
+
+    return readApiResponse<PublicMarket>(
+        response,
+    );
 }

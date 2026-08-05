@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import {
     motion,
@@ -26,23 +26,50 @@ import {
     Zap,
 } from "lucide-react";
 
+import {
+    getPublicMarket,
+    type PublicMarket,
+} from "@/src/lib/api";
+
+
 type Market = {
     id: string;
+    address: `0x${string}`;
     question: string;
-    category: "Crypto" | "AI" | "Politics" | "Economy" | "Technology";
+
+    category:
+    | "Crypto"
+    | "AI"
+    | "Politics"
+    | "Economy"
+    | "Technology";
+
     description: string;
     resolution: string;
     source: string;
+
     yesProbability: number;
-    volume: number;
-    liquidity: number;
-    traders: number;
-    agents: number;
+    noProbability: number;
+
+    collateralUsdc: number;
+    totalSharesYes: number;
+    totalSharesNo: number;
+
     closesIn: string;
     closeDate: string;
-    change: number;
+
     creator: string;
-    contract: string;
+    oracle: string;
+
+    feeBps: number;
+    open: boolean;
+    resolved: boolean;
+
+    outcome:
+    | "UNRESOLVED"
+    | "YES"
+    | "NO"
+    | "INVALID";
 };
 
 type Trade = {
@@ -63,69 +90,6 @@ type ReasoningItem = {
     time: string;
 };
 
-const MARKETS: Market[] = [
-    {
-        id: "eth-above-4000-friday",
-        question: "Will ETH close above $4,000 this Friday?",
-        category: "Crypto",
-        description:
-            "This market resolves YES if the official ETH/USD closing price is above $4,000 at the stated deadline.",
-        resolution:
-            "The outcome is determined using the designated ETH/USD price feed at 23:59 UTC on the closing date. If the reported price is strictly above $4,000, the market resolves YES. Otherwise, it resolves NO.",
-        source: "Chainlink ETH/USD reference feed",
-        yesProbability: 64,
-        volume: 18420,
-        liquidity: 9260,
-        traders: 213,
-        agents: 7,
-        closesIn: "2d 14h",
-        closeDate: "Friday · 23:59 UTC",
-        change: 3.2,
-        creator: "0x61ae…2f91",
-        contract: "0x94de…c031",
-    },
-    {
-        id: "openai-new-model-august",
-        question: "Will OpenAI announce a new model before August?",
-        category: "AI",
-        description:
-            "This market resolves YES if OpenAI officially announces a new generally available model before the deadline.",
-        resolution:
-            "A qualifying announcement must appear on an official OpenAI channel before the deadline. Research previews and unconfirmed reports do not qualify.",
-        source: "Official OpenAI announcements",
-        yesProbability: 58,
-        volume: 12750,
-        liquidity: 6840,
-        traders: 184,
-        agents: 6,
-        closesIn: "5d 8h",
-        closeDate: "31 July · 23:59 UTC",
-        change: 1.8,
-        creator: "0x3a21…9b62",
-        contract: "0xa81f…7e14",
-    },
-];
-
-const FALLBACK_MARKET: Market = {
-    id: "unknown-market",
-    question: "Market not found",
-    category: "Technology",
-    description:
-        "The requested market does not exist or is no longer available.",
-    resolution:
-        "Return to the market explorer and choose an active market.",
-    source: "Not available",
-    yesProbability: 50,
-    volume: 0,
-    liquidity: 0,
-    traders: 0,
-    agents: 0,
-    closesIn: "—",
-    closeDate: "—",
-    change: 0,
-    creator: "—",
-    contract: "—",
-};
 
 const TRADES: Trade[] = [
     {
@@ -235,6 +199,185 @@ function formatMoney(value: number) {
     }).format(value);
 }
 
+function inferMarketCategory(
+    question: string,
+): Market["category"] {
+    const value =
+        question.toLowerCase();
+
+    if (
+        value.includes("btc") ||
+        value.includes("bitcoin") ||
+        value.includes("eth") ||
+        value.includes("ethereum") ||
+        value.includes("crypto")
+    ) {
+        return "Crypto";
+    }
+
+    if (
+        value.includes("ai") ||
+        value.includes("openai") ||
+        value.includes("model")
+    ) {
+        return "AI";
+    }
+
+    if (
+        value.includes("election") ||
+        value.includes("president") ||
+        value.includes("government")
+    ) {
+        return "Politics";
+    }
+
+    if (
+        value.includes("fed") ||
+        value.includes("rate") ||
+        value.includes("economy") ||
+        value.includes("inflation")
+    ) {
+        return "Economy";
+    }
+
+    return "Technology";
+}
+
+function formatClosingTime(
+    closeTime: string,
+): string {
+    const remaining =
+        new Date(closeTime).getTime() -
+        Date.now();
+
+    if (remaining <= 0) {
+        return "Closed";
+    }
+
+    const hours =
+        Math.floor(
+            remaining / 3_600_000,
+        );
+
+    if (hours < 24) {
+        return `${hours}h`;
+    }
+
+    return `${Math.floor(
+        hours / 24,
+    )}d`;
+}
+
+function formatCloseDate(
+    closeTime: string,
+): string {
+    return new Date(
+        closeTime,
+    ).toLocaleString(
+        "en-IN",
+        {
+            day: "2-digit",
+            month: "short",
+            year: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+        },
+    );
+}
+
+function shortenAddress(
+    address: string,
+): string {
+    return `${address.slice(
+        0,
+        6,
+    )}…${address.slice(-4)}`;
+}
+
+function toMarketView(
+    market: PublicMarket,
+): Market {
+    return {
+        id:
+            market.id,
+
+        address:
+            market.address,
+
+        question:
+            market.question,
+
+        category:
+            inferMarketCategory(
+                market.question,
+            ),
+
+        description:
+            market.resolved
+                ? `This market has resolved as ${market.outcome}.`
+                : market.open
+                    ? "This prediction market is currently open on Arc Testnet."
+                    : "This market is closed and awaiting resolution.",
+
+        resolution:
+            `The designated oracle ${shortenAddress(
+                market.oracle,
+            )} resolves this market after the closing time.`,
+
+        source:
+            `Oracle ${shortenAddress(
+                market.oracle,
+            )}`,
+
+        yesProbability:
+            market.yesPrice *
+            100,
+
+        noProbability:
+            market.noPrice *
+            100,
+
+        collateralUsdc:
+            market.collateralUsdc,
+
+        totalSharesYes:
+            market.totalSharesYes,
+
+        totalSharesNo:
+            market.totalSharesNo,
+
+        closesIn:
+            formatClosingTime(
+                market.closeTime,
+            ),
+
+        closeDate:
+            formatCloseDate(
+                market.closeTime,
+            ),
+
+        creator:
+            market.creator,
+
+        oracle:
+            market.oracle,
+
+        feeBps:
+            market.feeBps,
+
+        open:
+            market.open,
+
+        resolved:
+            market.resolved,
+
+        outcome:
+            market.outcome,
+    };
+}
+
+
 export default function MarketDetail({
     marketId,
 }: {
@@ -242,15 +385,27 @@ export default function MarketDetail({
 }) {
     const reduceMotion = useReducedMotion();
 
-    const market = useMemo(
-        () =>
-            MARKETS.find((item) => item.id === marketId) ??
-            FALLBACK_MARKET,
-        [marketId],
-    );
+    const [
+        publicMarket,
+        setPublicMarket,
+    ] =
+        useState<
+            PublicMarket | null
+        >(null);
 
-    const theme = CATEGORY_THEMES[market.category];
-    const noProbability = 100 - market.yesProbability;
+    const [
+        loading,
+        setLoading,
+    ] =
+        useState(true);
+
+    const [
+        loadError,
+        setLoadError,
+    ] =
+        useState<
+            string | null
+        >(null);
 
     const [selectedSide, setSelectedSide] =
         useState<"YES" | "NO">("YES");
@@ -259,6 +414,130 @@ export default function MarketDetail({
     const [activeTab, setActiveTab] = useState<
         "overview" | "activity" | "reasoning"
     >("overview");
+
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadMarket() {
+            setLoading(true);
+            setLoadError(null);
+
+            try {
+                const result =
+                    await getPublicMarket(
+                        marketId,
+                    );
+
+                if (!cancelled) {
+                    setPublicMarket(
+                        result,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load market:",
+                    error,
+                );
+
+                if (!cancelled) {
+                    setLoadError(
+                        error instanceof
+                            Error
+                            ? error.message
+                            : "Failed to load market.",
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(
+                        false,
+                    );
+                }
+            }
+        }
+
+        void loadMarket();
+
+        return () => {
+            cancelled =
+                true;
+        };
+    }, [
+        marketId,
+    ]);
+
+    const market =
+        useMemo(
+            () =>
+                publicMarket
+                    ? toMarketView(
+                        publicMarket,
+                    )
+                    : null,
+            [
+                publicMarket,
+            ],
+        );
+
+
+    if (loading) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] px-6">
+                <div className="w-full max-w-4xl animate-pulse space-y-5">
+                    <div className="h-5 w-36 rounded-full bg-slate-200" />
+
+                    <div className="h-16 w-full rounded-2xl bg-slate-200" />
+
+                    <div className="grid gap-4 sm:grid-cols-4">
+                        {Array.from({
+                            length: 4,
+                        }).map(
+                            (_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-28 rounded-[20px] bg-slate-200"
+                                />
+                            ),
+                        )}
+                    </div>
+
+                    <div className="h-80 rounded-[28px] bg-slate-200" />
+                </div>
+            </main>
+        );
+    }
+
+    if (
+        loadError ||
+        !market
+    ) {
+        return (
+            <main className="flex min-h-screen items-center justify-center bg-[#f7f6f2] px-6">
+                <div className="w-full max-w-lg rounded-[28px] border border-red-200 bg-red-50 p-8 text-center">
+                    <h1 className="text-2xl font-black text-red-700">
+                        Market unavailable
+                    </h1>
+
+                    <p className="mt-3 text-sm leading-6 text-red-600">
+                        {loadError ??
+                            "The requested market could not be found."}
+                    </p>
+
+                    <Link
+                        href="/markets"
+                        className="mt-7 inline-flex rounded-[14px] bg-slate-950 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-white"
+                    >
+                        Back to markets
+                    </Link>
+                </div>
+            </main>
+        );
+    }
+    const theme = CATEGORY_THEMES[market.category];
+    const noProbability = market.noProbability;
+
+
 
     const selectedProbability =
         selectedSide === "YES"
@@ -271,7 +550,7 @@ export default function MarketDetail({
 
     const estimatedReturn = estimatedShares;
 
-    const isPositive = market.change >= 0;
+
 
     return (
         <main className="relative min-h-screen overflow-hidden bg-[#f7f6f2] pb-24 pt-28">
@@ -345,20 +624,7 @@ export default function MarketDetail({
                                     Closes in {market.closesIn}
                                 </span>
 
-                                <span
-                                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[8px] font-black uppercase tracking-[0.14em] ${isPositive
-                                            ? "bg-emerald-50 text-emerald-700"
-                                            : "bg-rose-50 text-rose-700"
-                                        }`}
-                                >
-                                    {isPositive ? (
-                                        <TrendingUp className="h-3 w-3" />
-                                    ) : (
-                                        <TrendingDown className="h-3 w-3" />
-                                    )}
-                                    {isPositive ? "+" : ""}
-                                    {market.change}% today
-                                </span>
+
                             </div>
 
                             <h1
@@ -379,30 +645,35 @@ export default function MarketDetail({
                         <section className="mt-9 grid gap-4 sm:grid-cols-4">
                             <MetricCard
                                 icon={WalletCards}
-                                label="Volume"
-                                value={`$${formatMoney(
-                                    market.volume,
-                                )}`}
+                                label="Collateral"
+                                value={`${formatMoney(
+                                    market.collateralUsdc,
+                                )} USDC`}
+                            />
+
+                            <MetricCard
+                                icon={TrendingUp}
+                                label="YES shares"
+                                value={formatMoney(
+                                    market.totalSharesYes,
+                                )}
+                            />
+
+                            <MetricCard
+                                icon={TrendingDown}
+                                label="NO shares"
+                                value={formatMoney(
+                                    market.totalSharesNo,
+                                )}
                             />
 
                             <MetricCard
                                 icon={ShieldCheck}
-                                label="Liquidity"
-                                value={`$${formatMoney(
-                                    market.liquidity,
-                                )}`}
-                            />
-
-                            <MetricCard
-                                icon={Users}
-                                label="Traders"
-                                value={String(market.traders)}
-                            />
-
-                            <MetricCard
-                                icon={Bot}
-                                label="Agents"
-                                value={String(market.agents)}
+                                label="Trading fee"
+                                value={`${(
+                                    market.feeBps /
+                                    100
+                                ).toFixed(2)}%`}
                             />
                         </section>
 
@@ -942,7 +1213,7 @@ function OverviewTab({
 
                     <InfoRow
                         label="Contract"
-                        value={market.contract}
+                        value={market.address}
                         copy
                     />
 
@@ -1019,8 +1290,8 @@ function ActivityTab() {
                     <div>
                         <p
                             className={`font-mono text-[10px] font-black ${trade.side === "YES"
-                                    ? "text-emerald-700"
-                                    : "text-rose-700"
+                                ? "text-emerald-700"
+                                : "text-rose-700"
                                 }`}
                         >
                             {trade.side}

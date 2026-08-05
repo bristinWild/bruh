@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, useReducedMotion } from "framer-motion";
 import {
@@ -15,6 +15,11 @@ import {
     WalletCards,
 } from "lucide-react";
 
+import {
+    getPublicMarkets,
+    type PublicMarket,
+} from "@/src/lib/api";
+
 type MarketCategory =
     | "All"
     | "Crypto"
@@ -23,19 +28,38 @@ type MarketCategory =
     | "Economy"
     | "Technology";
 
-type Market = {
-    id: string;
-    question: string;
-    category: Exclude<MarketCategory, "All">;
-    description: string;
-    yesProbability: number;
-    volume: number;
-    traders: number;
-    agents: number;
-    closesIn: string;
-    change: number;
-    featured?: boolean;
-};
+type MarketCardData =
+    PublicMarket & {
+        category:
+        Exclude<
+            MarketCategory,
+            "All"
+        >;
+
+        description:
+        string;
+
+        yesProbability:
+        number;
+
+        volume:
+        number;
+
+        traders:
+        number;
+
+        agents:
+        number;
+
+        closesIn:
+        string;
+
+        change:
+        number;
+
+        featured:
+        boolean;
+    };
 
 const CATEGORIES: MarketCategory[] = [
     "All",
@@ -46,127 +70,7 @@ const CATEGORIES: MarketCategory[] = [
     "Technology",
 ];
 
-const MARKETS: Market[] = [
-    {
-        id: "eth-above-4000-friday",
-        question: "Will ETH close above $4,000 this Friday?",
-        category: "Crypto",
-        description:
-            "Resolves YES if the official ETH/USD closing price is above $4,000 at the specified market deadline.",
-        yesProbability: 64,
-        volume: 18420,
-        traders: 213,
-        agents: 7,
-        closesIn: "2d 14h",
-        change: 3.2,
-        featured: true,
-    },
-    {
-        id: "openai-new-model-august",
-        question: "Will OpenAI announce a new model before August?",
-        category: "AI",
-        description:
-            "Resolves using an official announcement published by OpenAI before the market deadline.",
-        yesProbability: 58,
-        volume: 12750,
-        traders: 184,
-        agents: 6,
-        closesIn: "5d 8h",
-        change: 1.8,
-        featured: true,
-    },
-    {
-        id: "fed-rate-cut-september",
-        question: "Will the Federal Reserve cut rates in September?",
-        category: "Economy",
-        description:
-            "Resolves YES if the target federal funds range is reduced during the September meeting.",
-        yesProbability: 38,
-        volume: 24620,
-        traders: 328,
-        agents: 8,
-        closesIn: "19d",
-        change: -2.4,
-    },
-    {
-        id: "btc-etf-inflow-billion",
-        question: "Will weekly Bitcoin ETF inflows exceed $1 billion?",
-        category: "Crypto",
-        description:
-            "Tracks combined net inflows across eligible spot Bitcoin exchange-traded funds.",
-        yesProbability: 71,
-        volume: 19380,
-        traders: 247,
-        agents: 9,
-        closesIn: "4d 3h",
-        change: 5.1,
-    },
-    {
-        id: "ai-agent-company-ipo",
-        question: "Will an AI-agent company file for an IPO this year?",
-        category: "AI",
-        description:
-            "Resolves from a publicly accessible regulatory filing by a qualifying AI-agent company.",
-        yesProbability: 43,
-        volume: 8940,
-        traders: 116,
-        agents: 5,
-        closesIn: "84d",
-        change: -0.8,
-    },
-    {
-        id: "new-us-stablecoin-law",
-        question: "Will the US pass a new stablecoin law this year?",
-        category: "Politics",
-        description:
-            "Resolves YES if qualifying federal stablecoin legislation is signed into law.",
-        yesProbability: 69,
-        volume: 22100,
-        traders: 301,
-        agents: 8,
-        closesIn: "112d",
-        change: 2.7,
-    },
-    {
-        id: "solana-daily-transactions",
-        question: "Will Solana process over 150M transactions tomorrow?",
-        category: "Technology",
-        description:
-            "Uses the final daily transaction total reported by the designated blockchain data source.",
-        yesProbability: 54,
-        volume: 7680,
-        traders: 91,
-        agents: 4,
-        closesIn: "17h",
-        change: 0.9,
-    },
-    {
-        id: "inflation-below-three",
-        question: "Will US annual inflation fall below 3% next month?",
-        category: "Economy",
-        description:
-            "Resolves from the official year-over-year CPI figure published for the target month.",
-        yesProbability: 46,
-        volume: 15320,
-        traders: 205,
-        agents: 6,
-        closesIn: "31d",
-        change: -1.3,
-    },
-    {
-        id: "apple-ai-device",
-        question: "Will Apple announce a dedicated AI device this year?",
-        category: "Technology",
-        description:
-            "Requires an official Apple announcement for a standalone consumer device primarily positioned around AI.",
-        yesProbability: 32,
-        volume: 10640,
-        traders: 142,
-        agents: 5,
-        closesIn: "96d",
-        change: 2.1,
-    },
-];
+
 
 const CATEGORY_THEMES: Record<
     Exclude<MarketCategory, "All">,
@@ -227,18 +131,139 @@ function formatVolume(volume: number) {
         maximumFractionDigits: 1,
     }).format(volume);
 }
+function inferMarketCategory(
+    question:
+        string,
+): Exclude<
+    MarketCategory,
+    "All"
+> {
+    const normalized =
+        question.toLowerCase();
+
+    if (
+        normalized.includes(
+            "btc",
+        ) ||
+        normalized.includes(
+            "bitcoin",
+        ) ||
+        normalized.includes(
+            "eth",
+        ) ||
+        normalized.includes(
+            "ethereum",
+        ) ||
+        normalized.includes(
+            "crypto",
+        )
+    ) {
+        return "Crypto";
+    }
+
+    if (
+        normalized.includes(
+            "ai",
+        ) ||
+        normalized.includes(
+            "openai",
+        ) ||
+        normalized.includes(
+            "model",
+        )
+    ) {
+        return "AI";
+    }
+
+    if (
+        normalized.includes(
+            "election",
+        ) ||
+        normalized.includes(
+            "president",
+        ) ||
+        normalized.includes(
+            "government",
+        )
+    ) {
+        return "Politics";
+    }
+
+    if (
+        normalized.includes(
+            "fed",
+        ) ||
+        normalized.includes(
+            "rate",
+        ) ||
+        normalized.includes(
+            "economy",
+        ) ||
+        normalized.includes(
+            "inflation",
+        )
+    ) {
+        return "Economy";
+    }
+
+    return "Technology";
+}
+
+function formatClosingTime(
+    value:
+        string,
+): string {
+    const closeTime =
+        new Date(
+            value,
+        ).getTime();
+
+    const remaining =
+        closeTime -
+        Date.now();
+
+    if (
+        remaining <= 0
+    ) {
+        return "Closed";
+    }
+
+    const hours =
+        Math.floor(
+            remaining /
+            3_600_000,
+        );
+
+    if (
+        hours < 24
+    ) {
+        return `${hours}h`;
+    }
+
+    const days =
+        Math.floor(
+            hours /
+            24,
+        );
+
+    return `${days}d`;
+}
 
 function MarketCard({
     market,
     index,
 }: {
-    market: Market;
-    index: number;
+    market:
+    MarketCardData;
+
+    index:
+    number;
 }) {
     const reduceMotion = useReducedMotion();
     const theme = CATEGORY_THEMES[market.category];
     const noProbability = 100 - market.yesProbability;
     const isPositive = market.change >= 0;
+
 
     return (
         <motion.article
@@ -371,14 +396,14 @@ function MarketCard({
 
                             <div
                                 className={`flex items-center gap-1 rounded-full px-2.5 py-1.5 font-mono text-[9px] font-black ${isPositive
-                                        ? "bg-emerald-50 text-emerald-700"
-                                        : "bg-rose-50 text-rose-700"
+                                    ? "bg-emerald-50 text-emerald-700"
+                                    : "bg-rose-50 text-rose-700"
                                     }`}
                             >
                                 <TrendingUp
                                     className={`h-3 w-3 ${isPositive
-                                            ? ""
-                                            : "rotate-180"
+                                        ? ""
+                                        : "rotate-180"
                                         }`}
                                 />
                                 {isPositive ? "+" : ""}
@@ -476,6 +501,28 @@ function MarketCard({
 }
 
 export default function MarketsExplorer() {
+
+    const [
+        markets,
+        setMarkets,
+    ] =
+        useState<
+            PublicMarket[]
+        >([]);
+
+    const [
+        loading,
+        setLoading,
+    ] =
+        useState(true);
+
+    const [
+        loadError,
+        setLoadError,
+    ] =
+        useState<
+            string | null
+        >(null);
     const [activeCategory, setActiveCategory] =
         useState<MarketCategory>("All");
 
@@ -484,28 +531,151 @@ export default function MarketsExplorer() {
         "popular" | "closing" | "probability"
     >("popular");
 
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadMarkets() {
+            setLoading(true);
+            setLoadError(null);
+
+            try {
+                const data =
+                    await getPublicMarkets();
+
+                if (!cancelled) {
+                    setMarkets(
+                        data,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load markets:",
+                    error,
+                );
+
+                if (!cancelled) {
+                    setLoadError(
+                        error instanceof
+                            Error
+                            ? error.message
+                            : "Failed to load markets.",
+                    );
+                }
+            } finally {
+                if (!cancelled) {
+                    setLoading(
+                        false,
+                    );
+                }
+            }
+        }
+
+        void loadMarkets();
+
+        return () => {
+            cancelled =
+                true;
+        };
+    }, []);
+
+    const marketCards =
+        useMemo<
+            MarketCardData[]
+        >(
+            () =>
+                markets.map(
+                    (
+                        market,
+                    ) => {
+                        const category =
+                            inferMarketCategory(
+                                market.question,
+                            );
+
+                        return {
+                            ...market,
+
+                            category,
+
+                            description:
+                                market.resolved
+                                    ? `Resolved as ${market.outcome}.`
+                                    : market.open
+                                        ? "This market is open for prediction on Arc Testnet."
+                                        : "This market is closed and awaiting resolution.",
+
+                            yesProbability:
+                                Math.round(
+                                    market.yesPrice *
+                                    100,
+                                ),
+
+                            volume:
+                                market.collateralUsdc,
+
+                            traders:
+                                0,
+
+                            agents:
+                                0,
+
+                            closesIn:
+                                formatClosingTime(
+                                    market.closeTime,
+                                ),
+
+                            change:
+                                0,
+
+                            featured:
+                                market.open &&
+                                market.collateralUsdc >
+                                10,
+                        };
+                    },
+                ),
+            [
+                markets,
+            ],
+        );
+
     const filteredMarkets = useMemo(() => {
         const normalizedQuery = query.trim().toLowerCase();
 
-        const filtered = MARKETS.filter((market) => {
-            const categoryMatches =
-                activeCategory === "All" ||
-                market.category === activeCategory;
+        const filtered =
+            marketCards.filter(
+                (market) => {
+                    const categoryMatches =
+                        activeCategory ===
+                        "All" ||
+                        market.category ===
+                        activeCategory;
 
-            const searchMatches =
-                !normalizedQuery ||
-                market.question
-                    .toLowerCase()
-                    .includes(normalizedQuery) ||
-                market.description
-                    .toLowerCase()
-                    .includes(normalizedQuery) ||
-                market.category
-                    .toLowerCase()
-                    .includes(normalizedQuery);
+                    const searchMatches =
+                        !normalizedQuery ||
+                        market.question
+                            .toLowerCase()
+                            .includes(
+                                normalizedQuery,
+                            ) ||
+                        market.description
+                            .toLowerCase()
+                            .includes(
+                                normalizedQuery,
+                            ) ||
+                        market.category
+                            .toLowerCase()
+                            .includes(
+                                normalizedQuery,
+                            );
 
-            return categoryMatches && searchMatches;
-        });
+                    return (
+                        categoryMatches &&
+                        searchMatches
+                    );
+                },
+            );
 
         return [...filtered].sort((first, second) => {
             if (sort === "probability") {
@@ -516,14 +686,20 @@ export default function MarketsExplorer() {
             }
 
             if (sort === "closing") {
-                return first.closesIn.localeCompare(
-                    second.closesIn,
+                return (
+                    first.closeTimeUnix -
+                    second.closeTimeUnix
                 );
             }
 
             return second.volume - first.volume;
         });
-    }, [activeCategory, query, sort]);
+    }, [
+        marketCards,
+        activeCategory,
+        query,
+        sort,
+    ]);
 
     return (
         <main className="relative min-h-screen overflow-hidden bg-[#f7f6f2] pb-24 pt-28">
@@ -571,7 +747,14 @@ export default function MarketsExplorer() {
                                 </span>
 
                                 <span className="font-mono text-[8px] font-black uppercase tracking-[0.18em] text-slate-600">
-                                    {MARKETS.length} open markets
+                                    {
+                                        markets.filter(
+                                            (market) =>
+                                                market.open &&
+                                                !market.resolved,
+                                        ).length
+                                    }{" "}
+                                    open markets
                                 </span>
                             </div>
                         </div>
@@ -599,19 +782,29 @@ export default function MarketsExplorer() {
                         <StatCard
                             icon={WalletCards}
                             label="Open interest"
-                            value="$139K"
+                            value={`$${formatVolume(
+                                markets.reduce(
+                                    (
+                                        total,
+                                        market,
+                                    ) =>
+                                        total +
+                                        market.collateralUsdc,
+                                    0,
+                                ),
+                            )}`}
                         />
 
                         <StatCard
                             icon={Users}
                             label="Traders"
-                            value="1.8K"
+                            value="—"
                         />
 
                         <StatCard
                             icon={Bot}
                             label="Active agents"
-                            value="12"
+                            value="—"
                             className="col-span-2 sm:col-span-1"
                         />
                     </div>
@@ -709,14 +902,44 @@ export default function MarketsExplorer() {
                         </div>
                     </div>
 
-                    {filteredMarkets.length > 0 ? (
+                    {loading ? (
+                        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                            {Array.from({
+                                length: 3,
+                            }).map((_, index) => (
+                                <div
+                                    key={index}
+                                    className="h-[520px] animate-pulse rounded-[26px] border border-black/10 bg-white/60"
+                                />
+                            ))}
+                        </div>
+                    ) : loadError ? (
+                        <div className="rounded-[28px] border border-red-200 bg-red-50 px-6 py-16 text-center">
+                            <h2 className="text-xl font-black text-red-700">
+                                Markets unavailable
+                            </h2>
+
+                            <p className="mt-3 text-sm text-red-600">
+                                {loadError}
+                            </p>
+                        </div>
+                    ) : filteredMarkets.length > 0 ? (
                         <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                             {filteredMarkets.map(
-                                (market, index) => (
+                                (
+                                    market,
+                                    index,
+                                ) => (
                                     <MarketCard
-                                        key={market.id}
-                                        market={market}
-                                        index={index}
+                                        key={
+                                            market.id
+                                        }
+                                        market={
+                                            market
+                                        }
+                                        index={
+                                            index
+                                        }
                                     />
                                 ),
                             )}
@@ -743,7 +966,9 @@ export default function MarketsExplorer() {
                                 type="button"
                                 onClick={() => {
                                     setQuery("");
-                                    setActiveCategory("All");
+                                    setActiveCategory(
+                                        "All",
+                                    );
                                 }}
                                 className="mt-6 rounded-[13px] bg-slate-950 px-5 py-3 text-[10px] font-black uppercase tracking-[0.12em] text-white"
                             >
@@ -751,7 +976,8 @@ export default function MarketsExplorer() {
                             </button>
                         </div>
                     )}
-                </section>
+    </section>
+
             </div>
         </main>
     );
