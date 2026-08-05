@@ -43,6 +43,17 @@ export class MarketsController {
         );
     }
 
+    @Get(":address/history")
+    getHistory(
+        @Param("address")
+        address: string,
+    ) {
+        return this.markets
+            .getPriceHistory(
+                address,
+            );
+    }
+
     @Get(":address")
     findOne(
         @Param("address")

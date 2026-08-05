@@ -16,4 +16,7 @@ export const marketAbi =
         "function oracle() view returns (address)",
         "function feeBps() view returns (uint256)",
         "function noPrice() view returns (uint256)",
+
+        "event SharesBought(address indexed buyer, bool isYes, uint256 usdcIn, uint256 feeCharged, uint256 sharesOut, uint256 yesPriceAfter)",
+        "event SharesSold(address indexed seller, bool isYes, uint256 sharesIn, uint256 usdcOut, uint256 feeCharged, uint256 yesPriceAfter)",
     ]);
