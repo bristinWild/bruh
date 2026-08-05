@@ -32,6 +32,10 @@ const OUTCOMES = [
     "INVALID",
 ] as const;
 
+import {
+    RedisService,
+} from "../redis/redis.service";
+
 @Injectable()
 export class MarketsService {
     private readonly client;
@@ -42,6 +46,9 @@ export class MarketsService {
     constructor(
         private readonly config:
             ConfigService,
+
+        private readonly redis:
+            RedisService,
     ) {
         const rpcUrl =
             this.config.get<string>(
@@ -182,6 +189,21 @@ export class MarketsService {
     async getPriceHistory(
         address: string,
     ): Promise<MarketPricePoint[]> {
+
+        const cacheKey =
+            `market-history:${address.toLowerCase()}`;
+
+        const cached =
+            await this.redis.getJson<
+                MarketPricePoint[]
+            >(
+                cacheKey,
+            );
+
+        if (cached) {
+            return cached;
+        }
+
         try {
             const market =
                 await this.findOne(
@@ -429,29 +451,68 @@ export class MarketsService {
                 });
             }
 
+            await this.redis.setJson(
+                cacheKey,
+                history,
+                60,
+            );
+
             return history;
         } catch (error) {
             console.error(
                 "Failed to load market price history:",
-                error instanceof Error
-                    ? {
-                        name:
-                            error.name,
-                        message:
-                            error.message,
-                        stack:
-                            error.stack,
-                    }
-                    : error,
+                error,
             );
 
-            throw new InternalServerErrorException({
-                code:
-                    "MARKET_HISTORY_UNAVAILABLE",
+            const market =
+                await this.findOne(
+                    address,
+                );
 
-                message:
-                    "Unable to load market price history from Arc.",
-            });
+            const fallback:
+                MarketPricePoint[] = [
+                    {
+                        blockNumber:
+                            0,
+
+                        timestamp:
+                            market.createdAt,
+
+                        yesPrice:
+                            0.5,
+
+                        noPrice:
+                            0.5,
+
+                        eventType:
+                            "INITIAL",
+                    },
+
+                    {
+                        blockNumber:
+                            0,
+
+                        timestamp:
+                            new Date().toISOString(),
+
+                        yesPrice:
+                            market.yesPrice,
+
+                        noPrice:
+                            market.noPrice,
+
+                        eventType:
+                            "CURRENT",
+                    },
+                ];
+
+            await this.redis.setJson(
+                cacheKey,
+                fallback,
+                30,
+            );
+
+            return fallback;
         }
     }
 

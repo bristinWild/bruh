@@ -33,10 +33,15 @@ import {
   MarketsModule,
 } from "./markets/markets.module";
 
+import {
+  RedisModule,
+} from "./redis/redis.module";
+
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    RedisModule,
     ScheduleModule.forRoot(),
     PassportModule,
     JwtModule.register({

@@ -33,6 +33,7 @@
     "@supabase/supabase-js": "^2.111.0",
     "dotenv": "^17.4.2",
     "ethers": "^6.17.0",
+    "ioredis": "^6.0.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
