@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.115.0",
-    "@bruhmarket/agent-sdk": "file:../bruh-agent",
+    "@bruhmarket/agent-sdk": "^0.1.1",
     "@circle-fin/developer-controlled-wallets": "^10.8.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
