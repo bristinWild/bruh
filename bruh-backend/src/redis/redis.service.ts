@@ -62,10 +62,10 @@ export class RedisService
             );
 
         this.client.on(
-            "error",
-            (error) => {
-                this.logger.warn(
-                    `Redis error: ${error.message}`,
+            "connect",
+            () => {
+                this.logger.log(
+                    "Redis connected.",
                 );
             },
         );

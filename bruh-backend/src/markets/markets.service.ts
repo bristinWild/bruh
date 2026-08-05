@@ -199,10 +199,12 @@ export class MarketsService {
             >(
                 cacheKey,
             );
-
         if (cached) {
+            console.log("✅ Redis cache HIT:", cacheKey);
             return cached;
         }
+
+        console.log("❌ Redis cache MISS:", cacheKey);
 
         try {
             const market =
@@ -454,7 +456,7 @@ export class MarketsService {
             await this.redis.setJson(
                 cacheKey,
                 history,
-                60,
+                120,
             );
 
             return history;
