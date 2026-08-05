@@ -21,6 +21,7 @@ import {
 } from "./markets.abi";
 
 import type {
+    MarketPricePoint,
     PublicMarket,
 } from "./markets.types";
 
@@ -176,6 +177,282 @@ export class MarketsService {
         return this.readMarket(
             marketAddress,
         );
+    }
+
+    async getPriceHistory(
+        address: string,
+    ): Promise<MarketPricePoint[]> {
+        try {
+            const market =
+                await this.findOne(
+                    address,
+                );
+
+            const marketAddress =
+                market.address as Address;
+
+            const latestBlock =
+                await this.client
+                    .getBlockNumber();
+
+            // Keep the RPC query small enough for Arc.
+            // These markets were created recently, so 50k blocks is sufficient.
+
+            const MAX_BLOCK_RANGE = 10_000n;
+            const fromBlock =
+                latestBlock > MAX_BLOCK_RANGE
+                    ? latestBlock - MAX_BLOCK_RANGE
+                    : 0n;
+
+            const [
+                boughtLogs,
+                soldLogs,
+            ] =
+                await Promise.all([
+                    this.client
+                        .getContractEvents({
+                            address:
+                                marketAddress,
+
+                            abi:
+                                marketAbi,
+
+                            eventName:
+                                "SharesBought",
+
+                            fromBlock,
+
+                            toBlock:
+                                latestBlock,
+                        }),
+
+                    this.client
+                        .getContractEvents({
+                            address:
+                                marketAddress,
+
+                            abi:
+                                marketAbi,
+
+                            eventName:
+                                "SharesSold",
+
+                            fromBlock,
+
+                            toBlock:
+                                latestBlock,
+                        }),
+                ]);
+
+            const logs = [
+                ...boughtLogs
+                    .filter(
+                        (
+                            log,
+                        ): log is typeof log & {
+                            blockNumber: bigint;
+                        } =>
+                            log.blockNumber !==
+                            null &&
+                            log.args
+                                .yesPriceAfter !==
+                            undefined,
+                    )
+                    .map((log) => ({
+                        blockNumber:
+                            log.blockNumber,
+
+                        yesPriceAfter:
+                            log.args
+                                .yesPriceAfter as bigint,
+
+                        eventType:
+                            "BUY" as const,
+                    })),
+
+                ...soldLogs
+                    .filter(
+                        (
+                            log,
+                        ): log is typeof log & {
+                            blockNumber: bigint;
+                        } =>
+                            log.blockNumber !==
+                            null &&
+                            log.args
+                                .yesPriceAfter !==
+                            undefined,
+                    )
+                    .map((log) => ({
+                        blockNumber:
+                            log.blockNumber,
+
+                        yesPriceAfter:
+                            log.args
+                                .yesPriceAfter as bigint,
+
+                        eventType:
+                            "SELL" as const,
+                    })),
+            ].sort(
+                (
+                    first,
+                    second,
+                ) =>
+                    first.blockNumber <
+                        second.blockNumber
+                        ? -1
+                        : first.blockNumber >
+                            second.blockNumber
+                            ? 1
+                            : 0,
+            );
+
+            const uniqueBlocks =
+                Array.from(
+                    new Set(
+                        logs.map(
+                            (log) =>
+                                log.blockNumber,
+                        ),
+                    ),
+                );
+
+            const blockEntries =
+                await Promise.all(
+                    uniqueBlocks.map(
+                        async (
+                            blockNumber,
+                        ) => {
+                            const block =
+                                await this.client
+                                    .getBlock({
+                                        blockNumber,
+                                    });
+
+                            return [
+                                blockNumber,
+                                block.timestamp,
+                            ] as const;
+                        },
+                    ),
+                );
+
+            const timestamps =
+                new Map(
+                    blockEntries,
+                );
+
+            const points:
+                MarketPricePoint[] =
+                logs.map(
+                    (log) => {
+                        const yesPrice =
+                            Number(
+                                formatUnits(
+                                    log.yesPriceAfter,
+                                    18,
+                                ),
+                            );
+
+                        const blockTimestamp =
+                            timestamps.get(
+                                log.blockNumber,
+                            );
+
+                        return {
+                            blockNumber:
+                                Number(
+                                    log.blockNumber,
+                                ),
+
+                            timestamp:
+                                new Date(
+                                    Number(
+                                        blockTimestamp ??
+                                        0n,
+                                    ) *
+                                    1000,
+                                ).toISOString(),
+
+                            yesPrice,
+
+                            noPrice:
+                                1 -
+                                yesPrice,
+
+                            eventType:
+                                log.eventType,
+                        };
+                    },
+                );
+
+            const history: MarketPricePoint[] = [
+                {
+                    blockNumber: 0,
+                    timestamp: market.createdAt,
+                    yesPrice: 0.5,
+                    noPrice: 0.5,
+                    eventType: "INITIAL",
+                },
+
+                ...points,
+            ];
+
+            const latestPoint =
+                history[history.length - 1];
+
+            const currentPriceChanged =
+                Math.abs(
+                    latestPoint.yesPrice -
+                    market.yesPrice,
+                ) > 0.000001;
+
+            if (currentPriceChanged) {
+                history.push({
+                    blockNumber:
+                        Number(
+                            latestBlock,
+                        ),
+
+                    timestamp:
+                        new Date().toISOString(),
+
+                    yesPrice:
+                        market.yesPrice,
+
+                    noPrice:
+                        market.noPrice,
+
+                    eventType:
+                        "CURRENT",
+                });
+            }
+
+            return history;
+        } catch (error) {
+            console.error(
+                "Failed to load market price history:",
+                error instanceof Error
+                    ? {
+                        name:
+                            error.name,
+                        message:
+                            error.message,
+                        stack:
+                            error.stack,
+                    }
+                    : error,
+            );
+
+            throw new InternalServerErrorException({
+                code:
+                    "MARKET_HISTORY_UNAVAILABLE",
+
+                message:
+                    "Unable to load market price history from Arc.",
+            });
+        }
     }
 
     private async readMarket(
@@ -351,3 +628,6 @@ export class MarketsService {
         };
     }
 }
+
+
+

@@ -55,3 +55,15 @@ export interface PublicMarket {
     network:
     "eip155:5042002";
 }
+
+export interface MarketPricePoint {
+    blockNumber: number;
+    timestamp: string;
+    yesPrice: number;
+    noPrice: number;
+    eventType:
+    | "BUY"
+    | "SELL"
+    | "INITIAL"
+    | "CURRENT";
+}

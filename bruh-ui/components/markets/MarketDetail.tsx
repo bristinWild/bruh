@@ -534,15 +534,26 @@ export default function MarketDetail({
             </main>
         );
     }
-    const theme = CATEGORY_THEMES[market.category];
-    const noProbability = market.noProbability;
+    const theme =
+        CATEGORY_THEMES[
+        market.category
+        ];
 
+    const yesProbability =
+        market.yesProbability.toFixed(
+            1,
+        );
+
+    const noProbability =
+        market.noProbability.toFixed(
+            1,
+        );
 
 
     const selectedProbability =
-        selectedSide === "YES"
-            ? market.yesProbability
-            : noProbability;
+    selectedSide === "YES"
+        ? market.yesProbability
+        : market.noProbability;
 
     const estimatedShares =
         Number(amount || 0) /
@@ -621,7 +632,12 @@ export default function MarketDetail({
 
                                 <span className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 py-1.5 font-mono text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
                                     <Clock3 className="h-3 w-3" />
-                                    Closes in {market.closesIn}
+
+{market.open
+    ? `Closes in ${market.closesIn}`
+    : market.resolved
+      ? `Resolved ${market.outcome}`
+      : "Closed"}
                                 </span>
 
 
@@ -718,10 +734,8 @@ export default function MarketDetail({
                                                     color: theme.text,
                                                 }}
                                             >
-                                                {
-                                                    market.yesProbability
-                                                }
-                                                %
+                                                {yesProbability}%
+                                                
                                             </span>
 
                                             <span className="pb-1 text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">
@@ -737,10 +751,7 @@ export default function MarketDetail({
                                             </p>
 
                                             <p className="mt-1 font-mono text-[16px] font-black text-emerald-700">
-                                                {
-                                                    market.yesProbability
-                                                }
-                                                ¢
+                                                {yesProbability}¢
                                             </p>
                                         </div>
 
@@ -762,7 +773,7 @@ export default function MarketDetail({
                                             width: 0,
                                         }}
                                         animate={{
-                                            width: `${market.yesProbability}%`,
+                                            width: `${yesProbability}%`,
                                         }}
                                         transition={{
                                             duration: 0.8,
@@ -919,7 +930,8 @@ export default function MarketDetail({
                                                 "YES",
                                             )
                                         }
-                                        className="rounded-[16px] border px-4 py-4 text-left transition-all"
+                                        disabled={!market.open}
+                                        className="rounded-[16px] border px-4 py-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50"
                                         style={
                                             selectedSide === "YES"
                                                 ? {
@@ -942,12 +954,9 @@ export default function MarketDetail({
                                             YES
                                         </p>
 
-                                        <p className="mt-2 font-mono text-[22px] font-black text-emerald-700">
-                                            {
-                                                market.yesProbability
-                                            }
-                                            ¢
-                                        </p>
+                                       <p className="mt-2 font-mono text-[22px] font-black text-emerald-700">
+    {yesProbability}¢
+</p>
                                     </button>
 
                                     <button
@@ -1063,13 +1072,14 @@ export default function MarketDetail({
 
                                 <motion.button
                                     type="button"
+                                    disabled={!market.open}
                                     whileHover={{
                                         y: -2,
                                     }}
                                     whileTap={{
                                         scale: 0.98,
                                     }}
-                                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] px-5 py-3.5 text-[10px] font-black uppercase tracking-[0.12em] text-white"
+                                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] px-5 py-3.5 text-[10px] font-black uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-50"
                                     style={{
                                         background:
                                             selectedSide === "YES"
@@ -1077,7 +1087,9 @@ export default function MarketDetail({
                                                 : "linear-gradient(135deg, #F43F5E, #E11D48)",
                                     }}
                                 >
-                                    Buy {selectedSide}
+                                    {market.open
+    ? `Buy ${selectedSide}`
+    : "Market closed"}
 
                                     <ArrowUpRight className="h-3.5 w-3.5" />
                                 </motion.button>
