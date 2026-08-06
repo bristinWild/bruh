@@ -36,12 +36,15 @@ import {
 import {
     useAccount,
     useChainId,
+    usePublicClient,
     useReadContract,
+    useWriteContract,
 } from "wagmi";
 
 import {
     formatUnits,
     parseAbi,
+    parseUnits,
 } from "viem";
 
 import {
@@ -63,7 +66,14 @@ const ERC20_ABI =
     ]);
 
 
+const MARKET_TRADE_ABI =
+    parseAbi([
+        "function buy(bool isYes, uint256 usdcIn, uint256 minSharesOut) returns (uint256 sharesOut)",
+        "function previewBuy(bool isYes, uint256 usdcIn) view returns (uint256 sharesOut, uint256 fee)",
+    ]);
 
+const ARC_TESTNET_EXPLORER =
+    "https://testnet.arcscan.app";
 
 type Market = {
     id: string;
@@ -106,13 +116,13 @@ type Market = {
 };
 
 type Trade = {
-    id: number;
-    agent: string;
+    id: string;
+    trader: string;
     side: "YES" | "NO";
-    amount: string;
-    probability: string;
-    time: string;
-    tx: string;
+    amount: number;
+    probability: number;
+    timestamp: string;
+    txHash: `0x${string}`;
 };
 
 type ReasoningItem = {
@@ -122,46 +132,6 @@ type ReasoningItem = {
     confidence: number;
     time: string;
 };
-
-
-const TRADES: Trade[] = [
-    {
-        id: 1,
-        agent: "Newshound",
-        side: "YES",
-        amount: "4.20 USDC",
-        probability: "61¢",
-        time: "2m ago",
-        tx: "0x3f8a…c21e",
-    },
-    {
-        id: 2,
-        agent: "Actuary",
-        side: "NO",
-        amount: "2.10 USDC",
-        probability: "39¢",
-        time: "6m ago",
-        tx: "0x7d2b…f44a",
-    },
-    {
-        id: 3,
-        agent: "Newshound",
-        side: "YES",
-        amount: "3.80 USDC",
-        probability: "59¢",
-        time: "11m ago",
-        tx: "0x1c9e…a83d",
-    },
-    {
-        id: 4,
-        agent: "Actuary",
-        side: "YES",
-        amount: "1.60 USDC",
-        probability: "57¢",
-        time: "18m ago",
-        tx: "0x9a4f…b12c",
-    },
-];
 
 const REASONING: ReasoningItem[] = [
     {
@@ -460,10 +430,58 @@ export default function MarketDetail({
         setHistoryLoading,
     ] = useState(true);
 
+    const [
+        tradeStatus,
+        setTradeStatus,
+    ] = useState<
+        | "idle"
+        | "approving"
+        | "buying"
+        | "success"
+    >("idle");
+
+    const [
+        tradeTxHash,
+        setTradeTxHash,
+    ] = useState<
+        `0x${string}` | null
+    >(null);
+
+    const [
+        approvalTxHash,
+        setApprovalTxHash,
+    ] = useState<
+        `0x${string}` | null
+    >(null);
+
+    const [
+        tradeError,
+        setTradeError,
+    ] = useState<string | null>(
+        null,
+    );
+
+    const [
+        recentTrades,
+        setRecentTrades,
+    ] = useState<Trade[]>([]);
+
+    const publicClient =
+        usePublicClient({
+            chainId:
+                ARC_TESTNET_CHAIN_ID,
+        });
+
+    const {
+        writeContractAsync,
+    } = useWriteContract();
+
     const {
         address,
         isConnected,
     } = useAccount();
+
+
 
     const chainId =
         useChainId();
@@ -647,6 +665,368 @@ export default function MarketDetail({
                 publicMarket,
             ],
         );
+
+
+    const {
+        data:
+        allowanceRaw,
+        refetch:
+        refetchAllowance,
+    } = useReadContract({
+        address:
+            ARC_TESTNET_USDC,
+
+        abi:
+            ERC20_ABI,
+
+        functionName:
+            "allowance",
+
+        args:
+            address &&
+                marketId
+                ? [
+                    address,
+                    marketId as `0x${string}`,
+                ]
+                : undefined,
+
+        chainId:
+            ARC_TESTNET_CHAIN_ID,
+
+        query: {
+            enabled:
+                Boolean(address) &&
+                isConnected &&
+                isArcTestnet,
+        },
+    });
+
+
+    async function handleBuy() {
+        if (
+            !address ||
+            !isConnected
+        ) {
+            setTradeError(
+                "Connect your OKX wallet first.",
+            );
+
+            return;
+        }
+
+        if (!market) {
+            setTradeError(
+                "Market not loaded.",
+            );
+
+            return;
+        }
+
+        if (!isArcTestnet) {
+            setTradeError(
+                "Switch your wallet to Arc Testnet.",
+            );
+
+            return;
+        }
+
+        if (!publicMarket?.open) {
+            setTradeError(
+                "This market is closed.",
+            );
+
+            return;
+        }
+
+        if (!publicClient) {
+            setTradeError(
+                "Arc Testnet client is unavailable.",
+            );
+
+            return;
+        }
+
+        const amountNumber =
+            Number(amount);
+
+        if (
+            !Number.isFinite(
+                amountNumber,
+            ) ||
+            amountNumber < 0.01
+        ) {
+            setTradeError(
+                "Enter at least 0.01 USDC.",
+            );
+
+            return;
+        }
+
+        if (
+            amountNumber >
+            usdcBalance
+        ) {
+            setTradeError(
+                "Insufficient USDC balance.",
+            );
+
+            return;
+        }
+
+        const marketAddress = publicMarket.address;
+
+        const usdcAmount =
+            parseUnits(
+                amount,
+                6,
+            );
+
+        const currentAllowance =
+            typeof allowanceRaw ===
+                "bigint"
+                ? allowanceRaw
+                : BigInt(0);
+
+        setTradeError(null);
+        setTradeStatus("idle");
+        setTradeTxHash(null);
+        setApprovalTxHash(null);
+
+        try {
+            /*
+             * STEP 1: Approve USDC when needed.
+             */
+            if (
+                currentAllowance <
+                usdcAmount
+            ) {
+                setTradeStatus(
+                    "approving",
+                );
+
+                const approvalHash =
+                    await writeContractAsync({
+                        address:
+                            ARC_TESTNET_USDC,
+
+                        abi:
+                            ERC20_ABI,
+
+                        functionName:
+                            "approve",
+
+                        args: [
+                            marketAddress,
+                            usdcAmount,
+                        ],
+
+                        chainId:
+                            ARC_TESTNET_CHAIN_ID,
+                    });
+
+                setApprovalTxHash(
+                    approvalHash,
+                );
+
+                const approvalReceipt =
+                    await publicClient
+                        .waitForTransactionReceipt({
+                            hash:
+                                approvalHash,
+                        });
+
+                if (
+                    approvalReceipt.status !==
+                    "success"
+                ) {
+                    throw new Error(
+                        "USDC approval failed.",
+                    );
+                }
+
+                await refetchAllowance();
+            }
+
+            /*
+             * STEP 2: Get an on-chain trade preview.
+             */
+            const [
+                previewShares,
+            ] =
+                await publicClient
+                    .readContract({
+                        address:
+                            marketAddress,
+
+                        abi:
+                            MARKET_TRADE_ABI,
+
+                        functionName:
+                            "previewBuy",
+
+                        args: [
+                            selectedSide ===
+                            "YES",
+
+                            usdcAmount,
+                        ],
+                    });
+
+            if (
+                previewShares <= BigInt(0)
+            ) {
+                throw new Error(
+                    "The market returned zero shares for this trade.",
+                );
+            }
+
+            /*
+             * Allow 1% slippage.
+             */
+            const minSharesOut =
+                (
+                    previewShares *
+                    BigInt(99)
+                ) /
+                BigInt(100);
+            /*
+             * STEP 3: Buy YES or NO.
+             */
+            setTradeStatus(
+                "buying",
+            );
+
+            const buyHash =
+                await writeContractAsync({
+                    address:
+                        marketAddress,
+
+                    abi:
+                        MARKET_TRADE_ABI,
+
+                    functionName:
+                        "buy",
+
+                    args: [
+                        selectedSide ===
+                        "YES",
+
+                        usdcAmount,
+
+                        minSharesOut,
+                    ],
+
+                    chainId:
+                        ARC_TESTNET_CHAIN_ID,
+                });
+
+            setTradeTxHash(
+                buyHash,
+            );
+
+            const buyReceipt =
+                await publicClient
+                    .waitForTransactionReceipt({
+                        hash:
+                            buyHash,
+                    });
+
+            if (
+                buyReceipt.status !==
+                "success"
+            ) {
+                throw new Error(
+                    "The trade transaction failed.",
+                );
+            }
+
+            setTradeStatus(
+                "success",
+            );
+
+            const confirmedTrade: Trade = {
+                id:
+                    buyHash,
+
+                trader:
+                    address,
+
+                side:
+                    selectedSide,
+
+                amount:
+                    amountNumber,
+
+                probability:
+                    selectedSide ===
+                        "YES"
+                        ? market.yesProbability
+                        : market.noProbability,
+
+                timestamp:
+                    new Date().toISOString(),
+
+                txHash:
+                    buyHash,
+            };
+
+            setRecentTrades(
+                (current) => [
+                    confirmedTrade,
+                    ...current,
+                ],
+            );
+
+            setActiveTab(
+                "activity",
+            );
+
+            await Promise.all([
+                refetchUsdcBalance(),
+                refetchAllowance(),
+            ]);
+
+            const [
+                refreshedMarket,
+                refreshedHistory,
+            ] =
+                await Promise.all([
+                    getPublicMarket(
+                        marketId,
+                    ),
+
+                    getMarketPriceHistory(
+                        marketId,
+                    ),
+                ]);
+
+            setPublicMarket(
+                refreshedMarket,
+            );
+
+            setPriceHistory(
+                refreshedHistory,
+            );
+        } catch (error) {
+            console.error(
+                "Trade failed:",
+                error,
+            );
+
+            setTradeError(
+                error instanceof Error
+                    ? error.message
+                    : "The transaction was not completed.",
+            );
+
+            setTradeStatus(
+                "idle",
+            );
+        }
+    }
+
+
 
 
     if (loading) {
@@ -1043,9 +1423,10 @@ export default function MarketDetail({
                                 )}
 
                                 {activeTab === "activity" && (
-                                    <ActivityTab />
+                                    <ActivityTab
+                                        trades={recentTrades}
+                                    />
                                 )}
-
                                 {activeTab === "reasoning" && (
                                     <ReasoningTab
                                         theme={theme}
@@ -1249,31 +1630,38 @@ export default function MarketDetail({
                                 <motion.button
                                     type="button"
                                     onClick={() => {
-                                        if (!isConnected || !isArcTestnet) {
-                                            return;
-                                        }
-
-                                        console.log(
-                                            "Ready to buy",
-                                            selectedSide,
-                                            amount,
-                                            address,
-                                        );
+                                        void handleBuy();
                                     }}
                                     disabled={
                                         !market.open ||
                                         !isConnected ||
-                                        !isArcTestnet
+                                        !isArcTestnet ||
+                                        tradeStatus ===
+                                        "approving" ||
+                                        tradeStatus ===
+                                        "buying"
                                     }
                                     whileHover={
-                                        market.open
+                                        market.open &&
+                                            isConnected &&
+                                            isArcTestnet &&
+                                            tradeStatus !==
+                                            "approving" &&
+                                            tradeStatus !==
+                                            "buying"
                                             ? {
                                                 y: -2,
                                             }
                                             : undefined
                                     }
                                     whileTap={
-                                        market.open
+                                        market.open &&
+                                            isConnected &&
+                                            isArcTestnet &&
+                                            tradeStatus !==
+                                            "approving" &&
+                                            tradeStatus !==
+                                            "buying"
                                             ? {
                                                 scale: 0.98,
                                             }
@@ -1284,7 +1672,8 @@ export default function MarketDetail({
                                         background:
                                             !market.open
                                                 ? "linear-gradient(135deg, #94A3B8, #64748B)"
-                                                : selectedSide === "YES"
+                                                : selectedSide ===
+                                                    "YES"
                                                     ? "linear-gradient(135deg, #10B981, #059669)"
                                                     : "linear-gradient(135deg, #F43F5E, #E11D48)",
                                     }}
@@ -1295,10 +1684,86 @@ export default function MarketDetail({
                                             ? "Connect wallet above"
                                             : !isArcTestnet
                                                 ? "Switch network above"
-                                                : `Buy ${selectedSide}`}
+                                                : tradeStatus ===
+                                                    "approving"
+                                                    ? "Approving USDC..."
+                                                    : tradeStatus ===
+                                                        "buying"
+                                                        ? `Buying ${selectedSide}...`
+                                                        : tradeStatus ===
+                                                            "success"
+                                                            ? "Trade confirmed"
+                                                            : `Buy ${selectedSide}`}
 
                                     <ArrowUpRight className="h-3.5 w-3.5" />
                                 </motion.button>
+
+                                {tradeError && (
+                                    <div className="mt-3 rounded-[12px] border border-rose-200 bg-rose-50 px-3 py-3">
+                                        <p className="text-[9px] font-semibold leading-4 text-rose-700">
+                                            {tradeError}
+                                        </p>
+                                    </div>
+                                )}
+
+                                {tradeStatus ===
+                                    "approving" &&
+                                    approvalTxHash && (
+                                        <TransactionLink
+                                            label="USDC approval submitted"
+                                            hash={approvalTxHash}
+                                        />
+                                    )}
+
+                                {tradeStatus ===
+                                    "buying" &&
+                                    tradeTxHash && (
+                                        <TransactionLink
+                                            label={`${selectedSide} purchase submitted`}
+                                            hash={tradeTxHash}
+                                        />
+                                    )}
+
+                                {tradeStatus ===
+                                    "success" &&
+                                    tradeTxHash && (
+                                        <div className="mt-3 rounded-[14px] border border-emerald-200 bg-emerald-50 p-3.5">
+                                            <div className="flex items-start gap-3">
+                                                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-[10px] font-black text-emerald-800">
+                                                        Trade confirmed
+                                                    </p>
+
+                                                    <p className="mt-1 text-[9px] font-medium leading-4 text-emerald-700">
+                                                        Your {selectedSide} purchase was confirmed on Arc Testnet.
+                                                    </p>
+
+                                                    <a
+                                                        href={`${ARC_TESTNET_EXPLORER}/tx/${tradeTxHash}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="mt-3 flex items-center justify-between gap-3 rounded-[10px] border border-emerald-200 bg-white/70 px-3 py-2.5 transition-colors hover:bg-white"
+                                                    >
+                                                        <span className="min-w-0">
+                                                            <span className="block text-[7px] font-black uppercase tracking-[0.14em] text-emerald-600">
+                                                                Transaction
+                                                            </span>
+
+                                                            <span className="mt-1 block truncate font-mono text-[9px] font-black text-slate-700">
+                                                                {shortenAddress(
+                                                                    tradeTxHash,
+                                                                )}
+                                                            </span>
+                                                        </span>
+
+                                                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 <p className="mt-3 text-center text-[8px] font-semibold leading-relaxed text-slate-400">
                                     Your transaction will be submitted
                                     to the Arc market contract.
@@ -1428,6 +1893,37 @@ function MarketWalletButton({
                 );
             }}
         </ConnectButton.Custom>
+    );
+}
+
+function TransactionLink({
+    label,
+    hash,
+}: {
+    label: string;
+    hash: `0x${string}`;
+}) {
+    return (
+        <a
+            href={`${ARC_TESTNET_EXPLORER}/tx/${hash}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 flex items-center justify-between gap-3 rounded-[12px] border border-blue-200 bg-blue-50 px-3 py-3 transition-colors hover:bg-blue-100"
+        >
+            <span className="min-w-0">
+                <span className="block text-[8px] font-black text-blue-800">
+                    {label}
+                </span>
+
+                <span className="mt-1 block truncate font-mono text-[8px] font-semibold text-blue-600">
+                    {shortenAddress(
+                        hash,
+                    )}
+                </span>
+            </span>
+
+            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-blue-600" />
+        </a>
     );
 }
 
@@ -1837,57 +2333,110 @@ function InfoRow({
     );
 }
 
-function ActivityTab() {
+function ActivityTab({
+    trades,
+}: {
+    trades: Trade[];
+}) {
+    if (trades.length === 0) {
+        return (
+            <div className="rounded-[22px] border border-dashed border-black/10 bg-[#fffdf8]/75 px-6 py-12 text-center">
+                <TrendingUp className="mx-auto h-6 w-6 text-slate-300" />
+
+                <p className="mt-4 text-[12px] font-black text-slate-700">
+                    No trades in this session
+                </p>
+
+                <p className="mt-2 text-[10px] font-medium leading-5 text-slate-400">
+                    Confirmed YES and NO purchases will appear here.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="overflow-hidden rounded-[22px] border border-black/10 bg-[#fffdf8]/75">
             <div className="grid grid-cols-[1fr_auto_auto] gap-4 border-b border-black/10 px-5 py-4 text-[7px] font-black uppercase tracking-[0.15em] text-slate-400 sm:grid-cols-[1.4fr_0.7fr_0.7fr_0.7fr]">
                 <span>Trader</span>
                 <span>Position</span>
+
                 <span className="hidden sm:block">
                     Price
                 </span>
-                <span>Time</span>
+
+                <span>Transaction</span>
             </div>
 
-            {TRADES.map((trade) => (
-                <div
-                    key={trade.id}
-                    className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-black/5 px-5 py-4 last:border-0 sm:grid-cols-[1.4fr_0.7fr_0.7fr_0.7fr]"
-                >
-                    <div>
-                        <p className="text-[11px] font-black text-slate-800">
-                            {trade.agent}
-                        </p>
+            {trades.map(
+                (trade) => (
+                    <div
+                        key={trade.id}
+                        className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b border-black/5 px-5 py-4 last:border-0 sm:grid-cols-[1.4fr_0.7fr_0.7fr_0.7fr]"
+                    >
+                        <div className="min-w-0">
+                            <p className="font-mono text-[10px] font-black text-slate-800">
+                                {shortenAddress(
+                                    trade.trader,
+                                )}
+                            </p>
 
-                        <p className="mt-1 font-mono text-[8px] text-slate-400">
-                            {trade.tx}
-                        </p>
-                    </div>
+                            <p className="mt-1 font-mono text-[8px] text-slate-400">
+                                {new Date(
+                                    trade.timestamp,
+                                ).toLocaleTimeString(
+                                    [],
+                                    {
+                                        hour:
+                                            "2-digit",
 
-                    <div>
-                        <p
-                            className={`font-mono text-[10px] font-black ${trade.side === "YES"
-                                ? "text-emerald-700"
-                                : "text-rose-700"
-                                }`}
+                                        minute:
+                                            "2-digit",
+                                    },
+                                )}
+                            </p>
+                        </div>
+
+                        <div>
+                            <p
+                                className={`font-mono text-[10px] font-black ${trade.side ===
+                                    "YES"
+                                    ? "text-emerald-700"
+                                    : "text-rose-700"
+                                    }`}
+                            >
+                                {trade.side}
+                            </p>
+
+                            <p className="mt-1 whitespace-nowrap text-[8px] font-semibold text-slate-400">
+                                {trade.amount.toFixed(
+                                    2,
+                                )}{" "}
+                                USDC
+                            </p>
+                        </div>
+
+                        <span className="hidden font-mono text-[10px] font-black text-slate-600 sm:block">
+                            {trade.probability.toFixed(
+                                1,
+                            )}
+                            ¢
+                        </span>
+
+                        <a
+                            href={`${ARC_TESTNET_EXPLORER}/tx/${trade.txHash}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1.5 font-mono text-[8px] font-black text-violet-600 transition-colors hover:text-violet-800"
                         >
-                            {trade.side}
-                        </p>
+                            {shortenAddress(
+                                trade.txHash,
+                            )}
 
-                        <p className="mt-1 text-[8px] font-semibold text-slate-400">
-                            {trade.amount}
-                        </p>
+                            <ExternalLink className="h-3 w-3" />
+                        </a>
                     </div>
-
-                    <span className="hidden font-mono text-[10px] font-black text-slate-600 sm:block">
-                        {trade.probability}
-                    </span>
-
-                    <span className="font-mono text-[8px] font-semibold text-slate-400">
-                        {trade.time}
-                    </span>
-                </div>
-            ))}
+                ),
+            )}
         </div>
     );
 }
