@@ -33,6 +33,37 @@ import {
     type PublicMarket,
 } from "@/src/lib/api";
 
+import {
+    useAccount,
+    useChainId,
+    useReadContract,
+} from "wagmi";
+
+import {
+    formatUnits,
+    parseAbi,
+} from "viem";
+
+import {
+    ConnectButton,
+} from "@rainbow-me/rainbowkit";
+
+
+const ARC_TESTNET_CHAIN_ID =
+    5042002;
+
+const ARC_TESTNET_USDC =
+    "0x3600000000000000000000000000000000000000" as const;
+
+const ERC20_ABI =
+    parseAbi([
+        "function balanceOf(address account) view returns (uint256)",
+        "function allowance(address owner, address spender) view returns (uint256)",
+        "function approve(address spender, uint256 amount) returns (bool)",
+    ]);
+
+
+
 
 type Market = {
     id: string;
@@ -418,16 +449,70 @@ export default function MarketDetail({
     >("overview");
 
     const [
-    priceHistory,
-    setPriceHistory,
-] = useState<
-    MarketPricePoint[]
->([]);
+        priceHistory,
+        setPriceHistory,
+    ] = useState<
+        MarketPricePoint[]
+    >([]);
 
-const [
-    historyLoading,
-    setHistoryLoading,
-] = useState(true);
+    const [
+        historyLoading,
+        setHistoryLoading,
+    ] = useState(true);
+
+    const {
+        address,
+        isConnected,
+    } = useAccount();
+
+    const chainId =
+        useChainId();
+
+
+
+
+
+    const isArcTestnet =
+        chainId ===
+        ARC_TESTNET_CHAIN_ID;
+
+
+    const {
+        data:
+        usdcBalanceRaw,
+        isLoading:
+        usdcBalanceLoading,
+        refetch:
+        refetchUsdcBalance,
+    } = useReadContract({
+        address:
+            ARC_TESTNET_USDC,
+
+        abi:
+            ERC20_ABI,
+
+        functionName:
+            "balanceOf",
+
+        args:
+            address
+                ? [
+                    address,
+                ]
+                : undefined,
+
+        chainId:
+            ARC_TESTNET_CHAIN_ID,
+
+        query: {
+            enabled:
+                Boolean(
+                    address,
+                ) &&
+                isConnected &&
+                isArcTestnet,
+        },
+    });
 
     useEffect(() => {
         let cancelled =
@@ -483,60 +568,72 @@ const [
 
 
     useEffect(() => {
-    let cancelled =
-        false;
+        let cancelled =
+            false;
 
-    async function loadHistory() {
-        try {
-            const history =
-                await getMarketPriceHistory(
-                    marketId,
+        async function loadHistory() {
+            try {
+                const history =
+                    await getMarketPriceHistory(
+                        marketId,
+                    );
+
+                if (!cancelled) {
+                    setPriceHistory(
+                        history,
+                    );
+
+                    setHistoryLoading(
+                        false,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load market history:",
+                    error,
                 );
 
-            if (!cancelled) {
-                setPriceHistory(
-                    history,
-                );
-
-                setHistoryLoading(
-                    false,
-                );
-            }
-        } catch (error) {
-            console.error(
-                "Failed to load market history:",
-                error,
-            );
-
-            if (!cancelled) {
-                setHistoryLoading(
-                    false,
-                );
+                if (!cancelled) {
+                    setHistoryLoading(
+                        false,
+                    );
+                }
             }
         }
-    }
 
-    void loadHistory();
+        void loadHistory();
 
-    const interval =
-        window.setInterval(
-            () => {
-                void loadHistory();
-            },
-            120000,
-        );
+        const interval =
+            window.setInterval(
+                () => {
+                    void loadHistory();
+                },
+                120000,
+            );
 
-    return () => {
-        cancelled =
-            true;
+        return () => {
+            cancelled =
+                true;
 
-        window.clearInterval(
-            interval,
-        );
-    };
-}, [
-    marketId,
-]);
+            window.clearInterval(
+                interval,
+            );
+        };
+    }, [
+        marketId,
+    ]);
+
+
+    const usdcBalance =
+        typeof usdcBalanceRaw ===
+            "bigint"
+            ? Number(
+                formatUnits(
+                    usdcBalanceRaw,
+                    6,
+                ),
+            )
+            : 0;
 
     const market =
         useMemo(
@@ -622,9 +719,9 @@ const [
 
 
     const selectedProbability =
-    selectedSide === "YES"
-        ? market.yesProbability
-        : market.noProbability;
+        selectedSide === "YES"
+            ? market.yesProbability
+            : market.noProbability;
 
     const estimatedShares =
         Number(amount || 0) /
@@ -662,13 +759,20 @@ const [
             </div>
 
             <div className="relative mx-auto max-w-7xl px-6">
-                <Link
-                    href="/markets"
-                    className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 transition-colors hover:text-violet-600"
-                >
-                    <ArrowLeft className="h-3.5 w-3.5" />
-                    Back to markets
-                </Link>
+                <div className="flex items-center justify-between gap-4">
+                    <Link
+                        href="/markets"
+                        className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 transition-colors hover:text-violet-600"
+                    >
+                        <ArrowLeft className="h-3.5 w-3.5" />
+                        Back to markets
+                    </Link>
+
+                    <MarketWalletButton
+                        usdcBalance={usdcBalance}
+                        usdcBalanceLoading={usdcBalanceLoading}
+                    />
+                </div>
 
                 <section className="mt-8 grid gap-8 xl:grid-cols-[1fr_380px]">
                     <div className="min-w-0">
@@ -704,11 +808,11 @@ const [
                                 <span className="flex items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 py-1.5 font-mono text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
                                     <Clock3 className="h-3 w-3" />
 
-{market.open
-    ? `Closes in ${market.closesIn}`
-    : market.resolved
-      ? `Resolved ${market.outcome}`
-      : "Closed"}
+                                    {market.open
+                                        ? `Closes in ${market.closesIn}`
+                                        : market.resolved
+                                            ? `Resolved ${market.outcome}`
+                                            : "Closed"}
                                 </span>
 
 
@@ -806,7 +910,7 @@ const [
                                                 }}
                                             >
                                                 {yesProbability}%
-                                                
+
                                             </span>
 
                                             <span className="pb-1 text-[11px] font-black uppercase tracking-[0.15em] text-slate-500">
@@ -861,17 +965,17 @@ const [
                                     <div className="flex-1 bg-rose-300/70" />
                                 </div>
 
-                             <MarketPriceChart
-    points={
-        priceHistory
-    }
-    loading={
-        historyLoading
-    }
-    theme={
-        theme
-    }
-/>
+                                <MarketPriceChart
+                                    points={
+                                        priceHistory
+                                    }
+                                    loading={
+                                        historyLoading
+                                    }
+                                    theme={
+                                        theme
+                                    }
+                                />
                             </div>
                         </section>
 
@@ -983,6 +1087,8 @@ const [
                                     />
                                 </div>
 
+
+
                                 <div className="mt-5 grid grid-cols-2 gap-3">
                                     <button
                                         type="button"
@@ -1015,9 +1121,9 @@ const [
                                             YES
                                         </p>
 
-                                       <p className="mt-2 font-mono text-[22px] font-black text-emerald-700">
-    {yesProbability}¢
-</p>
+                                        <p className="mt-2 font-mono text-[22px] font-black text-emerald-700">
+                                            {yesProbability}¢
+                                        </p>
                                     </button>
 
                                     <button
@@ -1025,7 +1131,8 @@ const [
                                         onClick={() =>
                                             setSelectedSide("NO")
                                         }
-                                        className="rounded-[16px] border px-4 py-4 text-left transition-all"
+                                        disabled={!market.open}
+                                        className="rounded-[16px] border px-4 py-4 text-left transition-all disabled:cursor-not-allowed disabled:opacity-50"
                                         style={
                                             selectedSide === "NO"
                                                 ? {
@@ -1061,7 +1168,15 @@ const [
                                         </label>
 
                                         <span className="font-mono text-[9px] font-semibold text-slate-400">
-                                            Balance: 124.80 USDC
+                                            {!isConnected
+                                                ? "Wallet not connected"
+                                                : !isArcTestnet
+                                                    ? "Switch to Arc Testnet"
+                                                    : usdcBalanceLoading
+                                                        ? "Loading balance..."
+                                                        : `Balance: ${usdcBalance.toFixed(
+                                                            2,
+                                                        )} USDC`}
                                         </span>
                                     </div>
 
@@ -1133,28 +1248,57 @@ const [
 
                                 <motion.button
                                     type="button"
-                                    disabled={!market.open}
-                                    whileHover={{
-                                        y: -2,
+                                    onClick={() => {
+                                        if (!isConnected || !isArcTestnet) {
+                                            return;
+                                        }
+
+                                        console.log(
+                                            "Ready to buy",
+                                            selectedSide,
+                                            amount,
+                                            address,
+                                        );
                                     }}
-                                    whileTap={{
-                                        scale: 0.98,
-                                    }}
-                                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] px-5 py-3.5 text-[10px] font-black uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    disabled={
+                                        !market.open ||
+                                        !isConnected ||
+                                        !isArcTestnet
+                                    }
+                                    whileHover={
+                                        market.open
+                                            ? {
+                                                y: -2,
+                                            }
+                                            : undefined
+                                    }
+                                    whileTap={
+                                        market.open
+                                            ? {
+                                                scale: 0.98,
+                                            }
+                                            : undefined
+                                    }
+                                    className="mt-5 flex w-full items-center justify-center gap-2 rounded-[14px] px-5 py-3.5 text-[10px] font-black uppercase tracking-[0.12em] text-white disabled:cursor-not-allowed disabled:opacity-50"
                                     style={{
                                         background:
-                                            selectedSide === "YES"
-                                                ? "linear-gradient(135deg, #10B981, #059669)"
-                                                : "linear-gradient(135deg, #F43F5E, #E11D48)",
+                                            !market.open
+                                                ? "linear-gradient(135deg, #94A3B8, #64748B)"
+                                                : selectedSide === "YES"
+                                                    ? "linear-gradient(135deg, #10B981, #059669)"
+                                                    : "linear-gradient(135deg, #F43F5E, #E11D48)",
                                     }}
                                 >
-                                    {market.open
-    ? `Buy ${selectedSide}`
-    : "Market closed"}
+                                    {!market.open
+                                        ? "Market closed"
+                                        : !isConnected
+                                            ? "Connect wallet above"
+                                            : !isArcTestnet
+                                                ? "Switch network above"
+                                                : `Buy ${selectedSide}`}
 
                                     <ArrowUpRight className="h-3.5 w-3.5" />
                                 </motion.button>
-
                                 <p className="mt-3 text-center text-[8px] font-semibold leading-relaxed text-slate-400">
                                     Your transaction will be submitted
                                     to the Arc market contract.
@@ -1194,6 +1338,99 @@ const [
     );
 }
 
+function MarketWalletButton({
+    usdcBalance,
+    usdcBalanceLoading,
+}: {
+    usdcBalance: number;
+    usdcBalanceLoading: boolean;
+}) {
+    return (
+        <ConnectButton.Custom>
+            {({
+                account,
+                chain,
+                mounted,
+                openAccountModal,
+                openChainModal,
+                openConnectModal,
+            }) => {
+                const connected =
+                    mounted &&
+                    Boolean(account) &&
+                    Boolean(chain);
+
+                if (!mounted) {
+                    return (
+                        <div className="h-11 w-40 animate-pulse rounded-[14px] bg-slate-200" />
+                    );
+                }
+
+                if (!connected) {
+                    return (
+                        <button
+                            type="button"
+                            onClick={openConnectModal}
+                            className="flex items-center gap-2 rounded-[14px] bg-slate-950 px-5 py-3 text-[9px] font-black uppercase tracking-[0.12em] text-white shadow-lg shadow-slate-950/10 transition-all hover:-translate-y-0.5 hover:bg-violet-600"
+                        >
+                            <WalletCards className="h-4 w-4" />
+                            Connect Wallet
+                        </button>
+                    );
+                }
+
+                if (chain?.unsupported) {
+                    return (
+                        <button
+                            type="button"
+                            onClick={openChainModal}
+                            className="flex items-center gap-2 rounded-[14px] bg-amber-500 px-5 py-3 text-[9px] font-black uppercase tracking-[0.12em] text-white"
+                        >
+                            Switch to Arc Testnet
+                        </button>
+                    );
+                }
+
+                return (
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={openChainModal}
+                            className="hidden rounded-[13px] border border-black/10 bg-[#fffdf8] px-4 py-3 text-[9px] font-black text-slate-600 shadow-sm sm:block"
+                        >
+                            {chain?.name ?? "Unknown Network"}
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={openAccountModal}
+                            className="flex items-center gap-3 rounded-[14px] border border-black/10 bg-[#fffdf8] px-4 py-2.5 shadow-sm transition-all hover:border-violet-300 hover:shadow-md"
+                        >
+                            <span className="relative flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-blue-500">
+                                <WalletCards className="h-4 w-4 text-white" />
+
+                                <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
+                            </span>
+
+                            <span className="text-left">
+                                <span className="block font-mono text-[10px] font-black text-slate-800">
+                                    {account?.displayName}
+                                </span>
+
+                                <span className="mt-0.5 block font-mono text-[8px] font-semibold text-slate-400">
+                                    {usdcBalanceLoading
+                                        ? "Loading..."
+                                        : `${usdcBalance.toFixed(2)} USDC`}
+                                </span>
+                            </span>
+                        </button>
+                    </div>
+                );
+            }}
+        </ConnectButton.Custom>
+    );
+}
+
 
 function MarketPriceChart({
     points,
@@ -1201,13 +1438,13 @@ function MarketPriceChart({
     theme,
 }: {
     points:
-        MarketPricePoint[];
+    MarketPricePoint[];
 
     loading:
-        boolean;
+    boolean;
 
     theme:
-        (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
+    (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
 }) {
     if (loading) {
         return (
@@ -1254,7 +1491,7 @@ function MarketPriceChart({
     const range =
         Math.max(
             maximum -
-                minimum,
+            minimum,
             1,
         );
 
@@ -1267,24 +1504,24 @@ function MarketPriceChart({
                 const x =
                     points.length === 1
                         ? width /
-                          2
+                        2
                         : padding +
-                          (index /
-                              (points.length -
-                                  1)) *
-                              (width -
-                                  padding *
-                                      2);
+                        (index /
+                            (points.length -
+                                1)) *
+                        (width -
+                            padding *
+                            2);
 
                 const y =
                     padding +
                     ((maximum -
                         point.yesPrice *
-                            100) /
+                        100) /
                         range) *
-                        (height -
-                            padding *
-                                2);
+                    (height -
+                        padding *
+                        2);
 
                 return {
                     x,
@@ -1300,30 +1537,27 @@ function MarketPriceChart({
                     point,
                     index,
                 ) =>
-                    `${
-                        index === 0
-                            ? "M"
-                            : "L"
+                    `${index === 0
+                        ? "M"
+                        : "L"
                     } ${point.x} ${point.y}`,
             )
             .join(" ");
 
     const areaPath =
         coordinates.length > 0
-            ? `${linePath} L ${
-                  coordinates[
-                      coordinates.length -
-                          1
-                  ].x
-              } ${height} L ${
-                  coordinates[0].x
-              } ${height} Z`
+            ? `${linePath} L ${coordinates[
+                coordinates.length -
+                1
+            ].x
+            } ${height} L ${coordinates[0].x
+            } ${height} Z`
             : "";
 
     const latest =
         values[
-            values.length -
-                1
+        values.length -
+        1
         ];
 
     return (
@@ -1446,7 +1680,7 @@ function MarketPriceChart({
                     {new Date(
                         points[
                             points.length -
-                                1
+                            1
                         ].timestamp,
                     ).toLocaleTimeString(
                         [],

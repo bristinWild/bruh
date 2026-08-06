@@ -69,32 +69,34 @@ export class RedisService
                 );
             },
         );
+
+        this.client.on(
+            "error",
+            (error) => {
+                this.logger.warn(
+                    `Redis error: ${error.message}`,
+                );
+            },
+        );
     }
 
     async getJson<T>(
         key: string,
     ): Promise<T | null> {
-        if (!this.client) {
+        if (!(await this.ensureConnected())) {
             return null;
         }
 
         try {
-            if (
-                this.client.status ===
-                "wait"
-            ) {
-                await this.client.connect();
-            }
-
             const value =
-                await this.client.get(
+                await this.client!.get(
                     key,
                 );
 
             return value
-                ? (JSON.parse(
+                ? JSON.parse(
                     value,
-                ) as T)
+                )
                 : null;
         } catch (error) {
             this.logger.warn(
@@ -113,23 +115,14 @@ export class RedisService
         value: unknown,
         ttlSeconds: number,
     ): Promise<void> {
-        if (!this.client) {
+        if (!(await this.ensureConnected())) {
             return;
         }
 
         try {
-            if (
-                this.client.status ===
-                "wait"
-            ) {
-                await this.client.connect();
-            }
-
-            await this.client.set(
+            await this.client!.set(
                 key,
-                JSON.stringify(
-                    value,
-                ),
+                JSON.stringify(value),
                 "EX",
                 ttlSeconds,
             );
@@ -146,14 +139,12 @@ export class RedisService
     async delete(
         key: string,
     ): Promise<void> {
-        if (!this.client) {
+        if (!(await this.ensureConnected())) {
             return;
         }
 
         try {
-            await this.client.del(
-                key,
-            );
+            await this.client!.del(key);
         } catch (error) {
             this.logger.warn(
                 `Redis DEL failed for ${key}: ${error instanceof Error
@@ -171,6 +162,73 @@ export class RedisService
             "end"
         ) {
             this.client.disconnect();
+        }
+    }
+
+    private async ensureConnected(): Promise<boolean> {
+        const client =
+            this.client;
+
+        if (!client) {
+            return false;
+        }
+
+        if (client.status === "ready") {
+            return true;
+        }
+
+        if (client.status === "connecting") {
+            await new Promise<void>(
+                (resolve) => {
+                    const timeout =
+                        setTimeout(
+                            resolve,
+                            500,
+                        );
+
+                    client.once(
+                        "ready",
+                        () => {
+                            clearTimeout(
+                                timeout,
+                            );
+
+                            resolve();
+                        },
+                    );
+                },
+            );
+
+            const statusAfterWaiting:
+                string =
+                client.status;
+
+            return (
+                statusAfterWaiting ===
+                "ready"
+            );
+        }
+
+        try {
+            await client.connect();
+
+            const statusAfterConnect:
+                string =
+                client.status;
+
+            return (
+                statusAfterConnect ===
+                "ready"
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Redis connection failed: ${error instanceof Error
+                    ? error.message
+                    : "Unknown error"
+                }`,
+            );
+
+            return false;
         }
     }
 }

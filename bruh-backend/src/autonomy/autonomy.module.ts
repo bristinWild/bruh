@@ -30,9 +30,12 @@ import {
     MarketDiscoveryService,
 } from "./market-discovery.service";
 
+import { MarketsModule } from "src/markets/markets.module";
+
 @Module({
     imports: [
         AgentsModule,
+        MarketsModule,
     ],
 
     controllers: [

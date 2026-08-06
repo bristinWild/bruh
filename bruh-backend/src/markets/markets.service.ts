@@ -76,11 +76,30 @@ export class MarketsService {
                     http(rpcUrl),
             });
     }
-
     async findAll(
         offset = 0,
         limit = 100,
     ): Promise<PublicMarket[]> {
+        const safeLimit =
+            Math.min(
+                Math.max(limit, 1),
+                100,
+            );
+
+        const cacheKey =
+            `markets:list:${offset}:${safeLimit}`;
+
+        const cached =
+            await this.redis.getJson<
+                PublicMarket[]
+            >(
+                cacheKey,
+            );
+
+        if (cached) {
+            return cached;
+        }
+
         try {
             const addresses =
                 await this.client.readContract({
@@ -96,10 +115,7 @@ export class MarketsService {
                     args: [
                         BigInt(offset),
                         BigInt(
-                            Math.min(
-                                Math.max(limit, 1),
-                                100,
-                            ),
+                            safeLimit,
                         ),
                     ],
                 });
@@ -108,22 +124,52 @@ export class MarketsService {
                 await Promise.all(
                     addresses.map(
                         (address) =>
-                            this.readMarket(
+                            this.readMarketCached(
                                 address,
                             ),
                     ),
                 );
 
-            return markets.sort(
-                (first, second) =>
-                    first.closeTimeUnix -
-                    second.closeTimeUnix,
+            const sorted =
+                markets.sort(
+                    (
+                        first,
+                        second,
+                    ) =>
+                        first.closeTimeUnix -
+                        second.closeTimeUnix,
+                );
+
+            await this.redis.setJson(
+                cacheKey,
+                sorted,
+                120,
             );
+
+
+            await this.redis.setJson(
+                `${cacheKey}:stale`,
+                sorted,
+                3600,
+            );
+
+            return sorted;
         } catch (error) {
             console.error(
                 "Failed to load markets:",
                 error,
             );
+
+            const stale =
+                await this.redis.getJson<
+                    PublicMarket[]
+                >(
+                    `${cacheKey}:stale`,
+                );
+
+            if (stale) {
+                return stale;
+            }
 
             throw new InternalServerErrorException({
                 code:
@@ -155,35 +201,74 @@ export class MarketsService {
         const marketAddress =
             address as Address;
 
-        const exists =
-            await this.client.readContract({
-                address:
-                    this.factoryAddress,
+        const cached =
+            await this.redis.getJson<
+                PublicMarket
+            >(
+                `market:${address.toLowerCase()}`,
+            );
 
-                abi:
-                    marketFactoryAbi,
-
-                functionName:
-                    "isMarket",
-
-                args: [
-                    marketAddress,
-                ],
-            });
-
-        if (!exists) {
-            throw new NotFoundException({
-                code:
-                    "MARKET_NOT_FOUND",
-
-                message:
-                    "Market not found.",
-            });
+        if (cached) {
+            return cached;
         }
 
-        return this.readMarket(
-            marketAddress,
-        );
+        try {
+            const exists =
+                await this.client.readContract({
+                    address:
+                        this.factoryAddress,
+
+                    abi:
+                        marketFactoryAbi,
+
+                    functionName:
+                        "isMarket",
+
+                    args: [
+                        marketAddress,
+                    ],
+                });
+
+            if (!exists) {
+                throw new NotFoundException({
+                    code:
+                        "MARKET_NOT_FOUND",
+
+                    message:
+                        "Market not found.",
+                });
+            }
+
+            return this.readMarketCached(
+                marketAddress,
+            );
+        } catch (error) {
+            const stale =
+                await this.redis.getJson<
+                    PublicMarket
+                >(
+                    `market:${address.toLowerCase()}:stale`,
+                );
+
+            if (stale) {
+                return stale;
+            }
+
+            if (
+                error instanceof
+                NotFoundException
+            ) {
+                throw error;
+            }
+
+            throw new InternalServerErrorException({
+                code:
+                    "MARKET_UNAVAILABLE",
+
+                message:
+                    "Unable to load this market from Arc.",
+            });
+        }
     }
 
     async getPriceHistory(
@@ -515,6 +600,61 @@ export class MarketsService {
             );
 
             return fallback;
+        }
+    }
+
+    private async readMarketCached(
+        address: Address,
+    ): Promise<PublicMarket> {
+        const normalizedAddress =
+            address.toLowerCase();
+
+        const cacheKey =
+            `market:${normalizedAddress}`;
+
+        const cached =
+            await this.redis.getJson<
+                PublicMarket
+            >(
+                cacheKey,
+            );
+
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const market =
+                await this.readMarket(
+                    address,
+                );
+
+            await this.redis.setJson(
+                cacheKey,
+                market,
+                60,
+            );
+
+            await this.redis.setJson(
+                `${cacheKey}:stale`,
+                market,
+                3600,
+            );
+
+            return market;
+        } catch (error) {
+            const stale =
+                await this.redis.getJson<
+                    PublicMarket
+                >(
+                    `${cacheKey}:stale`,
+                );
+
+            if (stale) {
+                return stale;
+            }
+
+            throw error;
         }
     }
 

@@ -8,18 +8,17 @@ import {
 
 import {
     RainbowKitProvider,
-    getDefaultConfig,
+    connectorsForWallets,
     lightTheme,
 } from "@rainbow-me/rainbowkit";
 
 import {
-    coinbaseWallet,
-    metaMaskWallet,
     okxWallet,
-    walletConnectWallet,
 } from "@rainbow-me/rainbowkit/wallets";
 
 import {
+    createConfig,
+    http,
     WagmiProvider,
 } from "wagmi";
 
@@ -58,49 +57,55 @@ const arcTestnet = {
     testnet: true,
 } as const;
 
-let cachedConfig:
-    ReturnType<
-        typeof getDefaultConfig
-    >
-    | null = null;
 
-function getConfig() {
-    if (!cachedConfig) {
-        cachedConfig =
-            getDefaultConfig({
-                appName:
-                    "Bruh",
+const walletConnectProjectId =
+    process.env
+        .NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
+    "fc4faa437744b2d6061f2f92db239b22";
 
-                projectId:
-                    process.env
-                        .NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ??
-                    "fc4faa437744b2d6061f2f92db239b22",
-
-                chains: [
-                    arcTestnet,
-                ],
-
-                ssr:
-                    false,
+const connectors =
+    connectorsForWallets(
+        [
+            {
+                groupName:
+                    "Recommended",
 
                 wallets: [
-                    {
-                        groupName:
-                            "Popular",
-
-                        wallets: [
-                            okxWallet,
-                            metaMaskWallet,
-                            coinbaseWallet,
-                            walletConnectWallet,
-                        ],
-                    },
+                    okxWallet,
                 ],
-            });
-    }
+            },
+        ],
+        {
+            appName:
+                "Bruh",
 
-    return cachedConfig;
-}
+            projectId:
+                walletConnectProjectId,
+        },
+    );
+
+const config =
+    createConfig({
+        chains: [
+            arcTestnet,
+        ],
+
+        connectors,
+
+        transports: {
+            [arcTestnet.id]:
+                http(
+                    "https://rpc.testnet.arc.network",
+                ),
+        },
+
+        ssr:
+            false,
+
+        multiInjectedProviderDiscovery:
+            false,
+    });
+
 
 export function Web3ProviderClient({
     children,
@@ -111,13 +116,6 @@ export function Web3ProviderClient({
         useState(
             () =>
                 new QueryClient(),
-        );
-
-    const config =
-        useMemo(
-            () =>
-                getConfig(),
-            [],
         );
 
     const customTheme =
