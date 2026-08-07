@@ -19,6 +19,13 @@ import {
     getPublicMarkets,
 } from "@/src/lib/api";
 
+import Link from "next/link";
+
+import {
+    ArrowUpRight,
+    Coins,
+    Plus,
+} from "lucide-react";
 
 function formatClosesIn(
     closeTime: string,
@@ -450,6 +457,52 @@ export default function MarketsSection() {
                     reason, and stake USDC autonomously as prices
                     update with every trade.
                 </p>
+
+                <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                    <Link
+                        href="/markets/create"
+                        className="
+            group
+            inline-flex
+            items-center
+            gap-2
+            rounded-[14px]
+            bg-gradient-to-r
+            from-violet-600
+            to-blue-500
+            px-5
+            py-3
+            text-[9px]
+            font-black
+            uppercase
+            tracking-[0.14em]
+            text-white
+            shadow-lg
+            shadow-violet-500/15
+            transition-all
+            duration-200
+            hover:-translate-y-0.5
+            hover:shadow-xl
+            hover:shadow-violet-500/20
+        "
+                    >
+                        <span className="flex h-6 w-6 items-center justify-center rounded-[8px] bg-white/15">
+                            <Plus className="h-3.5 w-3.5" />
+                        </span>
+
+                        Create market
+
+                        <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                    </Link>
+
+                    <div className="flex items-center gap-2 text-[9px] font-semibold text-slate-400">
+                        <Coins className="h-3.5 w-3.5 text-violet-500" />
+
+                        <span>
+                            Requires 15 USDC seed
+                        </span>
+                    </div>
+                </div>
             </motion.div>
 
             {/* Carousel */}
