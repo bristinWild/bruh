@@ -54,6 +54,17 @@ export class MarketsController {
             );
     }
 
+    @Get(":address/activity")
+    getActivity(
+        @Param("address")
+        address: string,
+    ) {
+        return this.markets
+            .getActivity(
+                address,
+            );
+    }
+
     @Get(":address")
     findOne(
         @Param("address")
@@ -63,4 +74,6 @@ export class MarketsController {
             address,
         );
     }
+
+
 }

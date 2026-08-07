@@ -67,3 +67,40 @@ export interface MarketPricePoint {
     | "INITIAL"
     | "CURRENT";
 }
+
+export type MarketActivity = {
+    id: string;
+
+    transactionHash:
+    `0x${string}`;
+
+    blockNumber:
+    number;
+
+    timestamp:
+    string;
+
+    trader:
+    `0x${string}`;
+
+    action:
+    "BUY" | "SELL";
+
+    side:
+    "YES" | "NO";
+
+    usdcAmount:
+    number;
+
+    shares:
+    number;
+
+    feeUsdc:
+    number;
+
+    yesPrice:
+    number;
+
+    noPrice:
+    number;
+};

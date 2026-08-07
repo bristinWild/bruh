@@ -21,6 +21,7 @@ import {
 } from "./markets.abi";
 
 import type {
+    MarketActivity,
     MarketPricePoint,
     PublicMarket,
 } from "./markets.types";
@@ -600,6 +601,443 @@ export class MarketsService {
             );
 
             return fallback;
+        }
+    }
+
+    async getActivity(
+        address: string,
+    ): Promise<MarketActivity[]> {
+        const normalizedAddress =
+            address.toLowerCase();
+
+        const cacheKey =
+            `market-activity:${normalizedAddress}`;
+
+        const staleKey =
+            `${cacheKey}:stale`;
+
+        const cached =
+            await this.redis.getJson<
+                MarketActivity[]
+            >(
+                cacheKey,
+            );
+
+        if (cached) {
+            return cached;
+        }
+
+        try {
+            const market =
+                await this.findOne(
+                    address,
+                );
+
+            const marketAddress =
+                market.address as Address;
+
+            const latestBlock =
+                await this.client
+                    .getBlockNumber();
+
+            /*
+             * Public Arc RPC limits eth_getLogs
+             * to 10,000 blocks per request.
+             */
+            const CHUNK_SIZE =
+                BigInt(9_500);
+
+            /*
+             * Start from approximately the
+             * market creation period.
+             *
+             * We already know these markets
+             * are recent, so scan backwards
+             * until we cover the required
+             * activity window.
+             */
+            const MAX_SCAN_RANGE =
+                BigInt(100_000);
+
+            const firstBlock =
+                latestBlock >
+                    MAX_SCAN_RANGE
+                    ? latestBlock -
+                    MAX_SCAN_RANGE
+                    : BigInt(0);
+
+            const boughtLogs:
+                Awaited<
+                    ReturnType<
+                        typeof this.client.getContractEvents
+                    >
+                > = [];
+
+            const soldLogs:
+                Awaited<
+                    ReturnType<
+                        typeof this.client.getContractEvents
+                    >
+                > = [];
+
+            let fromBlock =
+                firstBlock;
+
+            while (
+                fromBlock <=
+                latestBlock
+            ) {
+                const toBlock =
+                    fromBlock +
+                        CHUNK_SIZE >
+                        latestBlock
+                        ? latestBlock
+                        : fromBlock +
+                        CHUNK_SIZE;
+
+                const [
+                    buys,
+                    sells,
+                ] =
+                    await Promise.all([
+                        this.client
+                            .getContractEvents({
+                                address:
+                                    marketAddress,
+
+                                abi:
+                                    marketAbi,
+
+                                eventName:
+                                    "SharesBought",
+
+                                fromBlock,
+
+                                toBlock,
+                            }),
+
+                        this.client
+                            .getContractEvents({
+                                address:
+                                    marketAddress,
+
+                                abi:
+                                    marketAbi,
+
+                                eventName:
+                                    "SharesSold",
+
+                                fromBlock,
+
+                                toBlock,
+                            }),
+                    ]);
+
+                boughtLogs.push(
+                    ...buys,
+                );
+
+                soldLogs.push(
+                    ...sells,
+                );
+
+                if (
+                    toBlock ===
+                    latestBlock
+                ) {
+                    break;
+                }
+
+                fromBlock =
+                    toBlock +
+                    BigInt(1);
+            }
+
+            const rawActivities = [
+                ...boughtLogs
+                    .filter(
+                        (log) =>
+                            log.blockNumber !==
+                            null &&
+                            log.transactionHash !==
+                            null,
+                    )
+                    .map(
+                        (log) => ({
+                            transactionHash:
+                                log.transactionHash!,
+
+                            blockNumber:
+                                log.blockNumber!,
+
+                            logIndex:
+                                log.logIndex ?? 0,
+
+                            trader:
+                                log.args
+                                    .buyer as Address,
+
+                            action:
+                                "BUY" as const,
+
+                            side:
+                                log.args
+                                    .isYes
+                                    ? ("YES" as const)
+                                    : ("NO" as const),
+
+                            usdcAmount:
+                                log.args
+                                    .usdcIn as bigint,
+
+                            shares:
+                                log.args
+                                    .sharesOut as bigint,
+
+                            fee:
+                                log.args
+                                    .feeCharged as bigint,
+
+                            yesPriceAfter:
+                                log.args
+                                    .yesPriceAfter as bigint,
+                        }),
+                    ),
+
+                ...soldLogs
+                    .filter(
+                        (log) =>
+                            log.blockNumber !==
+                            null &&
+                            log.transactionHash !==
+                            null,
+                    )
+                    .map(
+                        (log) => ({
+                            transactionHash:
+                                log.transactionHash!,
+
+                            blockNumber:
+                                log.blockNumber!,
+
+                            logIndex:
+                                log.logIndex ?? 0,
+
+                            trader:
+                                log.args
+                                    .seller as Address,
+
+                            action:
+                                "SELL" as const,
+
+                            side:
+                                log.args
+                                    .isYes
+                                    ? ("YES" as const)
+                                    : ("NO" as const),
+
+                            usdcAmount:
+                                log.args
+                                    .usdcOut as bigint,
+
+                            shares:
+                                log.args
+                                    .sharesIn as bigint,
+
+                            fee:
+                                log.args
+                                    .feeCharged as bigint,
+
+                            yesPriceAfter:
+                                log.args
+                                    .yesPriceAfter as bigint,
+                        }),
+                    ),
+            ].sort(
+                (
+                    first,
+                    second,
+                ) => {
+                    if (
+                        first.blockNumber ===
+                        second.blockNumber
+                    ) {
+                        return (
+                            first.logIndex -
+                            second.logIndex
+                        );
+                    }
+
+                    return first.blockNumber <
+                        second.blockNumber
+                        ? -1
+                        : 1;
+                },
+            );
+
+            const uniqueBlocks =
+                Array.from(
+                    new Set(
+                        rawActivities.map(
+                            (activity) =>
+                                activity.blockNumber,
+                        ),
+                    ),
+                );
+
+            const blockEntries =
+                await Promise.all(
+                    uniqueBlocks.map(
+                        async (
+                            blockNumber,
+                        ) => {
+                            const block =
+                                await this.client
+                                    .getBlock({
+                                        blockNumber,
+                                    });
+
+                            return [
+                                blockNumber,
+                                block.timestamp,
+                            ] as const;
+                        },
+                    ),
+                );
+
+            const timestamps =
+                new Map(
+                    blockEntries,
+                );
+
+            const activities:
+                MarketActivity[] =
+                rawActivities
+                    .map(
+                        (
+                            activity,
+                        ) => {
+                            const yesPrice =
+                                Number(
+                                    formatUnits(
+                                        activity
+                                            .yesPriceAfter,
+                                        18,
+                                    ),
+                                );
+
+                            const timestamp =
+                                timestamps.get(
+                                    activity
+                                        .blockNumber,
+                                );
+
+                            return {
+                                id:
+                                    `${activity.transactionHash}:${activity.logIndex}`,
+
+                                transactionHash:
+                                    activity.transactionHash,
+
+                                blockNumber:
+                                    Number(
+                                        activity.blockNumber,
+                                    ),
+
+                                timestamp:
+                                    new Date(
+                                        Number(
+                                            timestamp ??
+                                            BigInt(
+                                                0,
+                                            ),
+                                        ) *
+                                        1000,
+                                    ).toISOString(),
+
+                                trader:
+                                    activity.trader,
+
+                                action:
+                                    activity.action,
+
+                                side:
+                                    activity.side,
+
+                                usdcAmount:
+                                    Number(
+                                        formatUnits(
+                                            activity
+                                                .usdcAmount,
+                                            6,
+                                        ),
+                                    ),
+
+                                shares:
+                                    Number(
+                                        formatUnits(
+                                            activity
+                                                .shares,
+                                            6,
+                                        ),
+                                    ),
+
+                                feeUsdc:
+                                    Number(
+                                        formatUnits(
+                                            activity
+                                                .fee,
+                                            6,
+                                        ),
+                                    ),
+
+                                yesPrice,
+
+                                noPrice:
+                                    1 -
+                                    yesPrice,
+                            };
+                        },
+                    )
+                    .reverse();
+
+            await this.redis.setJson(
+                cacheKey,
+                activities,
+                30,
+            );
+
+            await this.redis.setJson(
+                staleKey,
+                activities,
+                3600,
+            );
+
+            return activities;
+        } catch (error) {
+            console.error(
+                "Failed to load market activity:",
+                error,
+            );
+
+            const stale =
+                await this.redis.getJson<
+                    MarketActivity[]
+                >(
+                    staleKey,
+                );
+
+            if (stale) {
+                return stale;
+            }
+
+            throw new InternalServerErrorException({
+                code:
+                    "MARKET_ACTIVITY_UNAVAILABLE",
+
+                message:
+                    "Unable to load market activity from Arc.",
+            });
         }
     }
 
