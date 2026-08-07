@@ -17,6 +17,17 @@ export const marketAbi =
         "function feeBps() view returns (uint256)",
         "function noPrice() view returns (uint256)",
 
+        /*
+         * Authoritative wallet position sizes.
+         */
+        "function sharesYes(address account) view returns (uint256)",
+        "function sharesNo(address account) view returns (uint256)",
+
+        /*
+         * Actual CPMM exit value.
+         */
+        "function previewSell(bool isYes, uint256 sharesIn) view returns (uint256 usdcOut, uint256 fee)",
+
         "event SharesBought(address indexed buyer, bool isYes, uint256 usdcIn, uint256 feeCharged, uint256 sharesOut, uint256 yesPriceAfter)",
         "event SharesSold(address indexed seller, bool isYes, uint256 sharesIn, uint256 usdcOut, uint256 feeCharged, uint256 yesPriceAfter)",
     ]);
