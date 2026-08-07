@@ -14,6 +14,8 @@ import {
     Users,
 } from "lucide-react";
 
+import Link from "next/link";
+
 export type Market = {
     id: string;
     question: string;
@@ -483,8 +485,7 @@ export default function MarketCard({
                                     </p>
                                 </div>
 
-                                <motion.button
-                                    type="button"
+                                <motion.div
                                     whileHover={{
                                         y: -2,
                                         scale: 1.015,
@@ -492,19 +493,23 @@ export default function MarketCard({
                                     whileTap={{
                                         scale: 0.98,
                                     }}
-                                    className="flex items-center gap-2 rounded-[13px] px-4 py-2.5 text-[11px] font-black text-white"
-                                    style={{
-                                        background: `linear-gradient(
-                                            135deg,
-                                            ${theme.primary},
-                                            ${theme.secondary}
-                                        )`,
-                                        boxShadow: `0 12px 24px -16px ${theme.shadow}`,
-                                    }}
                                 >
-                                    View market
-                                    <ArrowUpRight className="h-3.5 w-3.5" />
-                                </motion.button>
+                                    <Link
+                                        href={`/markets/${market.id}`}
+                                        className="flex items-center gap-2 rounded-[13px] px-4 py-2.5 text-[11px] font-black text-white"
+                                        style={{
+                                            background: `linear-gradient(
+                135deg,
+                ${theme.primary},
+                ${theme.secondary}
+            )`,
+                                            boxShadow: `0 12px 24px -16px ${theme.shadow}`,
+                                        }}
+                                    >
+                                        View market
+                                        <ArrowUpRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </motion.div>
                             </div>
                         </div>
                     </div>

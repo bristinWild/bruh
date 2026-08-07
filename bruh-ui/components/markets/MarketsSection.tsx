@@ -13,58 +13,63 @@ import MarketCard, {
     type Market,
 } from "./MarketCard";
 
-const MOCK_MARKETS: Market[] = [
-    {
-        id: "1",
-        question: "Will ETH close above $4,000 this Friday?",
-        yesPrice: 0.64,
-        volume: 142,
-        closesIn: "2d 14h",
-        agentCount: 2,
-        trades: 18,
-    },
-    {
-        id: "2",
-        question: "Will the Fed announce a rate cut in September?",
-        yesPrice: 0.41,
-        volume: 89,
-        closesIn: "6d 8h",
-        agentCount: 2,
-        trades: 11,
-    },
-    {
-        id: "3",
-        question: "Will Bitcoin ETF inflows exceed $1B this week?",
-        yesPrice: 0.73,
-        volume: 214,
-        closesIn: "1d 3h",
-        agentCount: 2,
-        trades: 27,
-    },
-    {
-        id: "4",
-        question: "Will OpenAI release a new model before August?",
-        yesPrice: 0.55,
-        volume: 67,
-        closesIn: "12d 6h",
-        agentCount: 2,
-        trades: 8,
-    },
-    {
-        id: "5",
-        question: "Will Solana process over 150M transactions tomorrow?",
-        yesPrice: 0.58,
-        volume: 301,
-        closesIn: "18h",
-        agentCount: 2,
-        trades: 34,
+import {
+    getMarketAgentDecisions,
+    getMarketStats,
+    getPublicMarkets,
+} from "@/src/lib/api";
+
+
+function formatClosesIn(
+    closeTime: string,
+): string {
+    const remaining =
+        new Date(closeTime).getTime() -
+        Date.now();
+
+    if (remaining <= 0) {
+        return "Closed";
     }
-];
+
+    const totalHours =
+        Math.floor(
+            remaining /
+            3_600_000,
+        );
+
+    const days =
+        Math.floor(
+            totalHours / 24,
+        );
+
+    const hours =
+        totalHours % 24;
+
+    if (days > 0) {
+        return `${days}d ${hours}h`;
+    }
+
+    return `${hours}h`;
+}
 
 export default function MarketsSection() {
     const reduce = useReducedMotion();
     const scrollRef = useRef<HTMLDivElement>(null);
-    const [activeIndex, setActiveIndex] = useState(2);
+    const [activeIndex, setActiveIndex] = useState(0);
+
+    const [
+        markets,
+        setMarkets,
+    ] =
+        useState<
+            Market[]
+        >([]);
+
+    const [
+        loading,
+        setLoading,
+    ] =
+        useState(true);
 
     /*
      * Start on the second card.
@@ -81,7 +86,17 @@ export default function MarketsSection() {
                     "[data-market-card]",
                 );
 
-            const initialCard = cards[2];
+            const initialIndex =
+                Math.min(
+                    2,
+                    cards.length -
+                    1,
+                );
+
+            const initialCard =
+                cards[
+                initialIndex
+                ];
 
             if (!initialCard) return;
 
@@ -97,7 +112,7 @@ export default function MarketsSection() {
         });
 
         return () => window.cancelAnimationFrame(frame);
-    }, []);
+    }, [markets.length]);
 
     /*
      * Track whichever card is closest to the center.
@@ -160,6 +175,164 @@ export default function MarketsSection() {
                 "scroll",
                 updateActiveCard,
             );
+        };
+    }, []);
+
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadMarkets() {
+            try {
+                setLoading(
+                    true,
+                );
+
+                const publicMarkets =
+                    await getPublicMarkets(
+                        20,
+                    );
+
+                /*
+                 * Landing page should only
+                 * show currently tradable markets.
+                 */
+                const openMarkets =
+                    publicMarkets.filter(
+                        (
+                            market,
+                        ) =>
+                            market.open &&
+                            !market.resolved,
+                    );
+
+                const enrichedMarkets =
+                    await Promise.all(
+                        openMarkets.map(
+                            async (
+                                market,
+                            ) => {
+                                const [
+                                    stats,
+                                    agentDecisions,
+                                ] =
+                                    await Promise.all([
+                                        getMarketStats(
+                                            market.address,
+                                        ),
+
+                                        getMarketAgentDecisions(
+                                            market.address,
+                                            20,
+                                        ),
+                                    ]);
+
+                                /*
+                                 * Count unique autonomous
+                                 * agents that have analyzed
+                                 * this market.
+                                 */
+                                const agentCount =
+                                    new Set(
+                                        agentDecisions
+                                            .map(
+                                                (
+                                                    decision,
+                                                ) =>
+                                                    decision.agentId,
+                                            )
+                                            .filter(
+                                                Boolean,
+                                            ),
+                                    ).size;
+
+                                const cardMarket:
+                                    Market = {
+                                    /*
+                                     * IMPORTANT:
+                                     * use address as id
+                                     * because your market detail
+                                     * route is address-based.
+                                     */
+                                    id:
+                                        market.address,
+
+                                    question:
+                                        market.question,
+
+                                    yesPrice:
+                                        market.yesPrice,
+
+                                    volume:
+                                        stats.totalVolumeUsdc,
+
+                                    closesIn:
+                                        formatClosesIn(
+                                            market.closeTime,
+                                        ),
+
+                                    agentCount,
+
+                                    trades:
+                                        stats.tradeCount,
+                                };
+
+                                return cardMarket;
+                            },
+                        ),
+                    );
+
+                if (
+                    !cancelled
+                ) {
+                    setMarkets(
+                        enrichedMarkets,
+                    );
+
+                    /*
+                     * Keep active index valid
+                     * when fewer than 3 markets exist.
+                     */
+                    setActiveIndex(
+                        Math.min(
+                            2,
+                            Math.max(
+                                enrichedMarkets.length -
+                                1,
+                                0,
+                            ),
+                        ),
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load landing markets:",
+                    error,
+                );
+
+                if (
+                    !cancelled
+                ) {
+                    setMarkets(
+                        [],
+                    );
+                }
+            } finally {
+                if (
+                    !cancelled
+                ) {
+                    setLoading(
+                        false,
+                    );
+                }
+            }
+        }
+
+        void loadMarkets();
+
+        return () => {
+            cancelled =
+                true;
         };
     }, []);
 
@@ -296,19 +469,61 @@ export default function MarketsSection() {
                     sm:px-[calc(50vw-195px)]
                 "
             >
-                {MOCK_MARKETS.map((market, index) => (
-                    <MarketCard
-                        key={market.id}
-                        market={market}
-                        index={index}
-                        containerRef={scrollRef}
-                    />
-                ))}
+                {loading ? (
+                    Array.from({
+                        length: 3,
+                    }).map(
+                        (
+                            _,
+                            index,
+                        ) => (
+                            <div
+                                key={index}
+                                className="
+                    h-[320px]
+                    w-[340px]
+                    shrink-0
+                    animate-pulse
+                    rounded-[24px]
+                    border
+                    border-black/5
+                    bg-slate-200/60
+                "
+                            />
+                        ),
+                    )
+                ) : markets.length === 0 ? (
+                    <div className="mx-auto flex min-h-[260px] w-[340px] shrink-0 items-center justify-center rounded-[24px] border border-dashed border-black/10 bg-white/40 px-8 text-center">
+                        <div>
+                            <p className="text-[13px] font-black text-slate-700">
+                                No open markets
+                            </p>
+
+                            <p className="mt-2 text-[10px] font-medium leading-5 text-slate-400">
+                                There are currently no active prediction markets.
+                            </p>
+                        </div>
+                    </div>
+                ) : (
+                    markets.map(
+                        (
+                            market,
+                            index,
+                        ) => (
+                            <MarketCard
+                                key={market.id}
+                                market={market}
+                                index={index}
+                                containerRef={scrollRef}
+                            />
+                        ),
+                    )
+                )}
             </div>
 
             {/* Carousel position */}
             <div className="relative mt-1 flex items-center justify-center gap-2">
-                {MOCK_MARKETS.map((market, index) => (
+                {markets.map((market, index) => (
                     <button
                         key={market.id}
                         type="button"
