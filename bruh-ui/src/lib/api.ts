@@ -306,6 +306,30 @@ export interface MarketPricePoint {
     | "CURRENT";
 }
 
+export type MarketActivity = {
+    id: string;
+    transactionHash: `0x${string}`;
+    blockNumber: number;
+    timestamp: string;
+
+    trader: `0x${string}`;
+
+    action:
+    | "BUY"
+    | "SELL";
+
+    side:
+    | "YES"
+    | "NO";
+
+    usdcAmount: number;
+    shares: number;
+    feeUsdc: number;
+
+    yesPrice: number;
+    noPrice: number;
+};
+
 // export interface InstalledAgentRunResult {
 //     runId: string;
 //     customAgentId: string;
@@ -1019,4 +1043,71 @@ export async function getMarketPriceHistory(
             data as MarketPricePoint[]
         )
         : [];
+}
+
+export async function getMarketActivity(
+    address: string,
+): Promise<MarketActivity[]> {
+    const response =
+        await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/markets/${address}/activity`,
+            {
+                cache:
+                    "no-store",
+            },
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "Failed to load market activity.",
+        );
+    }
+
+    return response.json();
+}
+
+export async function confirmMarketActivity(
+    address: string,
+    input: {
+        transactionHash: string;
+        trader: string;
+
+        side:
+        | "YES"
+        | "NO";
+
+        usdcAmount: number;
+
+        yesPrice: number;
+        noPrice: number;
+
+        timestamp?: string;
+    },
+): Promise<MarketActivity> {
+    const response =
+        await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/markets/${address}/activity/confirmed`,
+            {
+                method:
+                    "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json",
+                },
+
+                body:
+                    JSON.stringify(
+                        input,
+                    ),
+            },
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "Failed to persist confirmed market activity.",
+        );
+    }
+
+    return response.json();
 }

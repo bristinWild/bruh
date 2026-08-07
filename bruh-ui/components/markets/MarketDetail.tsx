@@ -27,10 +27,13 @@ import {
 } from "lucide-react";
 
 import {
+    getMarketActivity,
     getMarketPriceHistory,
     getPublicMarket,
+    type MarketActivity,
     type MarketPricePoint,
     type PublicMarket,
+    confirmMarketActivity,
 } from "@/src/lib/api";
 
 import {
@@ -426,6 +429,14 @@ export default function MarketDetail({
     >([]);
 
     const [
+        marketActivity,
+        setMarketActivity,
+    ] =
+        useState<
+            MarketActivity[]
+        >([]);
+
+    const [
         historyLoading,
         setHistoryLoading,
     ] = useState(true);
@@ -627,6 +638,59 @@ export default function MarketDetail({
                     void loadHistory();
                 },
                 120000,
+            );
+
+        return () => {
+            cancelled =
+                true;
+
+            window.clearInterval(
+                interval,
+            );
+        };
+    }, [
+        marketId,
+    ]);
+
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadActivity() {
+            try {
+                const activity =
+                    await getMarketActivity(
+                        marketId,
+                    );
+
+                if (!cancelled) {
+                    setMarketActivity(
+                        activity,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load market activity:",
+                    error,
+                );
+            }
+        }
+
+        void loadActivity();
+
+        /*
+         * Keep this slower than real-time
+         * for now.
+         *
+         * Later we'll replace polling
+         * with websocket/event updates.
+         */
+        const interval =
+            window.setInterval(
+                () => {
+                    void loadActivity();
+                },
+                30_000,
             );
 
         return () => {
@@ -978,6 +1042,87 @@ export default function MarketDetail({
                 ],
             );
 
+            try {
+                await confirmMarketActivity(
+                    marketId,
+                    {
+                        transactionHash:
+                            buyHash,
+
+                        trader:
+                            address,
+
+                        side:
+                            selectedSide,
+
+                        usdcAmount:
+                            amountNumber,
+
+                        /*
+                         * Use the currently displayed
+                         * post-buy probability for the
+                         * temporary entry.
+                         *
+                         * The indexer will later replace
+                         * this with the exact event value.
+                         */
+                        yesPrice:
+                            selectedSide ===
+                                "YES"
+                                ? market.yesProbability /
+                                100
+                                : 1 -
+                                market.noProbability /
+                                100,
+
+                        noPrice:
+                            selectedSide ===
+                                "NO"
+                                ? market.noProbability /
+                                100
+                                : 1 -
+                                market.yesProbability /
+                                100,
+
+                        timestamp:
+                            confirmedTrade.timestamp,
+                    },
+                );
+            } catch (error) {
+                /*
+                 * Don't fail the transaction UX
+                 * if persistence fails.
+                 *
+                 * The on-chain indexer can still
+                 * discover it later.
+                 */
+                console.error(
+                    "Failed to persist confirmed activity:",
+                    error,
+                );
+            }
+
+            window.setTimeout(
+                async () => {
+                    try {
+                        const activity =
+                            await getMarketActivity(
+                                marketId,
+                            );
+
+                        setMarketActivity(
+                            activity,
+                        );
+                    } catch (error) {
+                        console.error(
+                            "Failed to refresh market activity:",
+                            error,
+                        );
+                    }
+                },
+                5000,
+            );
+
             setActiveTab(
                 "activity",
             );
@@ -1109,7 +1254,62 @@ export default function MarketDetail({
 
     const estimatedReturn = estimatedShares;
 
+    const activityTrades:
+        Trade[] =
+        Array.from(
+            new Map(
+                [
+                    ...recentTrades,
 
+                    ...marketActivity.map(
+                        (activity) => ({
+                            id:
+                                activity.transactionHash,
+
+                            trader:
+                                activity.trader,
+
+                            side:
+                                activity.side,
+
+                            amount:
+                                activity.usdcAmount,
+
+                            probability:
+                                (
+                                    activity.side ===
+                                        "YES"
+                                        ? activity.yesPrice
+                                        : activity.noPrice
+                                ) *
+                                100,
+
+                            timestamp:
+                                activity.timestamp,
+
+                            txHash:
+                                activity.transactionHash,
+                        }),
+                    ),
+                ].map(
+                    (trade) => [
+                        trade.txHash,
+                        trade,
+                    ],
+                ),
+            ).values(),
+        ).sort(
+            (
+                first,
+                second,
+            ) =>
+                new Date(
+                    second.timestamp,
+                ).getTime() -
+                new Date(
+                    first.timestamp,
+                ).getTime(),
+        );
 
     return (
         <main className="relative min-h-screen overflow-hidden bg-[#f7f6f2] pb-24 pt-28">
@@ -1424,7 +1624,7 @@ export default function MarketDetail({
 
                                 {activeTab === "activity" && (
                                     <ActivityTab
-                                        trades={recentTrades}
+                                        trades={activityTrades}
                                     />
                                 )}
                                 {activeTab === "reasoning" && (

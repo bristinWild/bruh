@@ -103,4 +103,6 @@ export type MarketActivity = {
 
     noPrice:
     number;
+
+    pending?: boolean;
 };

@@ -10,6 +10,14 @@ import {
     MarketsService,
 } from "./markets.service";
 
+import {
+    MarketActivityIndexerService,
+} from "./market-activity-indexer.service";
+
+import {
+    MarketActivitySchedulerService,
+} from "./market-activity-scheduler.service";
+
 @Module({
     controllers: [
         MarketsController,
@@ -17,6 +25,8 @@ import {
 
     providers: [
         MarketsService,
+        MarketActivityIndexerService,
+        MarketActivitySchedulerService,
     ],
 
     exports: [

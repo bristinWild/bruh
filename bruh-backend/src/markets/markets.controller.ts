@@ -4,6 +4,8 @@ import {
     Param,
     ParseIntPipe,
     Query,
+    Body,
+    Post,
 } from "@nestjs/common";
 
 import {
@@ -62,6 +64,37 @@ export class MarketsController {
         return this.markets
             .getActivity(
                 address,
+            );
+    }
+
+    @Post(
+        ":address/activity/confirmed",
+    )
+    async addConfirmedActivity(
+        @Param("address")
+        address: string,
+
+        @Body()
+        body: {
+            transactionHash: string;
+            trader: string;
+
+            side:
+            | "YES"
+            | "NO";
+
+            usdcAmount: number;
+
+            yesPrice: number;
+            noPrice: number;
+
+            timestamp?: string;
+        },
+    ) {
+        return this.markets
+            .addConfirmedActivity(
+                address,
+                body,
             );
     }
 
