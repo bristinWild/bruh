@@ -26,6 +26,10 @@ import {
     RedisService,
 } from "../redis/redis.service";
 
+import {
+    MarketStreamService,
+} from "./market-stream.service";
+
 @Injectable()
 export class MarketActivityIndexerService {
     private readonly logger =
@@ -50,6 +54,9 @@ export class MarketActivityIndexerService {
 
         private readonly redis:
             RedisService,
+
+        private readonly marketStream:
+            MarketStreamService,
     ) {
         const rpcUrl =
             this.config.get<string>(
@@ -94,8 +101,12 @@ export class MarketActivityIndexerService {
         address: Address,
         fromBlock: bigint,
         toBlock: bigint,
+
         existingActivities:
             MarketActivity[] = [],
+
+        publishLiveEvents =
+            false,
     ): Promise<MarketActivity[]> {
         const normalizedAddress =
             address.toLowerCase();
@@ -524,6 +535,22 @@ export class MarketActivityIndexerService {
                 activities,
                 604800,
             );
+
+            if (
+                publishLiveEvents
+            ) {
+                for (
+                    const activity
+                    of chunkActivities
+                ) {
+                    this.marketStream
+                        .publishTrade(
+                            normalizedAddress,
+                            activity,
+                            "indexed",
+                        );
+                }
+            }
 
             /*
              * ------------------------------------------------

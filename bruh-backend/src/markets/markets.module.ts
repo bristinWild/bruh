@@ -18,6 +18,14 @@ import {
     MarketActivitySchedulerService,
 } from "./market-activity-scheduler.service";
 
+import {
+    MarketStreamService,
+} from "./market-stream.service";
+
+import {
+    SupabaseService,
+} from "../supabase.service";
+
 @Module({
     controllers: [
         MarketsController,
@@ -27,6 +35,8 @@ import {
         MarketsService,
         MarketActivityIndexerService,
         MarketActivitySchedulerService,
+        MarketStreamService,
+        SupabaseService,
     ],
 
     exports: [

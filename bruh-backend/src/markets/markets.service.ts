@@ -22,7 +22,10 @@ import {
 
 import type {
     MarketActivity,
+    MarketAgentDecision,
+    MarketPortfolio,
     MarketPricePoint,
+    MarketStats,
     PublicMarket,
 } from "./markets.types";
 
@@ -36,6 +39,14 @@ const OUTCOMES = [
 import {
     RedisService,
 } from "../redis/redis.service";
+
+import {
+    MarketStreamService,
+} from "./market-stream.service";
+
+import {
+    SupabaseService,
+} from "../supabase.service";
 
 
 
@@ -52,6 +63,12 @@ export class MarketsService {
 
         private readonly redis:
             RedisService,
+
+        private readonly marketStream:
+            MarketStreamService,
+
+        private readonly supabase:
+            SupabaseService,
     ) {
         const rpcUrl =
             this.config.get<string>(
@@ -598,6 +615,76 @@ export class MarketsService {
         );
     }
 
+    async getMarketStats(
+        address: string,
+    ): Promise<MarketStats> {
+        const market =
+            await this.findOne(
+                address,
+            );
+
+        const normalizedAddress =
+            address.toLowerCase();
+
+        const indexed =
+            await this.redis.getJson<
+                MarketActivity[]
+            >(
+                `market-activity:indexed:${normalizedAddress}`,
+            ) ?? [];
+
+        /*
+         * Count total USDC exchanged.
+         *
+         * BUY:
+         *   usdcAmount = amount entering market
+         *
+         * SELL:
+         *   usdcAmount = amount leaving market
+         *
+         * For "trading volume", both sides
+         * still count as traded notional.
+         */
+        const totalVolumeUsdc =
+            indexed.reduce(
+                (
+                    total,
+                    activity,
+                ) =>
+                    total +
+                    activity.usdcAmount,
+                0,
+            );
+
+        return {
+            /*
+             * Current collateral sitting
+             * inside the market.
+             *
+             * This is liquidity, NOT volume.
+             */
+            liquidityUsdc:
+                market.collateralUsdc,
+
+            totalVolumeUsdc,
+
+            yesPrice:
+                market.yesPrice,
+
+            noPrice:
+                market.noPrice,
+
+            yesShares:
+                market.totalSharesYes,
+
+            noShares:
+                market.totalSharesNo,
+
+            tradeCount:
+                indexed.length,
+        };
+    }
+
 
     async addConfirmedActivity(
         address: string,
@@ -749,7 +836,745 @@ export class MarketsService {
             3600,
         );
 
+        this.marketStream
+            .publishTrade(
+                normalizedAddress,
+                activity,
+                "pending",
+            );
+
         return activity;
+    }
+
+    async getPortfolio(
+        address: string,
+        wallet: string,
+    ): Promise<MarketPortfolio> {
+        if (
+            !/^0x[a-fA-F0-9]{40}$/.test(
+                address,
+            ) ||
+            !/^0x[a-fA-F0-9]{40}$/.test(
+                wallet,
+            )
+        ) {
+            throw new NotFoundException({
+                code:
+                    "INVALID_ADDRESS",
+
+                message:
+                    "Invalid market or wallet address.",
+            });
+        }
+
+        const normalizedMarket =
+            address.toLowerCase();
+
+        const normalizedWallet =
+            wallet.toLowerCase();
+
+        const marketAddress =
+            address as Address;
+
+        const walletAddress =
+            wallet as Address;
+
+        const market =
+            await this.findOne(
+                address,
+            );
+
+        /*
+         * ------------------------------------------------
+         * 1. Read authoritative share balances on-chain
+         * ------------------------------------------------
+         *
+         * These are the actual balances maintained
+         * by Market.sol.
+         */
+        const [
+            yesSharesRaw,
+            noSharesRaw,
+        ] =
+            await Promise.all([
+                this.client.readContract({
+                    address:
+                        marketAddress,
+
+                    abi:
+                        marketAbi,
+
+                    functionName:
+                        "sharesYes",
+
+                    args: [
+                        walletAddress,
+                    ],
+                }),
+
+                this.client.readContract({
+                    address:
+                        marketAddress,
+
+                    abi:
+                        marketAbi,
+
+                    functionName:
+                        "sharesNo",
+
+                    args: [
+                        walletAddress,
+                    ],
+                }),
+            ]);
+
+        const yesShares =
+            Number(
+                formatUnits(
+                    yesSharesRaw,
+                    6,
+                ),
+            );
+
+        const noShares =
+            Number(
+                formatUnits(
+                    noSharesRaw,
+                    6,
+                ),
+            );
+
+        /*
+         * ------------------------------------------------
+         * 2. Get actual current exit value
+         * ------------------------------------------------
+         *
+         * previewSell() uses the contract's CPMM
+         * calculation and includes the sell fee.
+         *
+         * This is much more accurate than:
+         *
+         * shares * probability
+         */
+        const [
+            yesPreview,
+            noPreview,
+        ] =
+            await Promise.all([
+                yesSharesRaw >
+                    0n
+                    ? this.client.readContract({
+                        address:
+                            marketAddress,
+
+                        abi:
+                            marketAbi,
+
+                        functionName:
+                            "previewSell",
+
+                        args: [
+                            true,
+                            yesSharesRaw,
+                        ],
+                    })
+                    : Promise.resolve(
+                        [
+                            0n,
+                            0n,
+                        ] as const,
+                    ),
+
+                noSharesRaw >
+                    0n
+                    ? this.client.readContract({
+                        address:
+                            marketAddress,
+
+                        abi:
+                            marketAbi,
+
+                        functionName:
+                            "previewSell",
+
+                        args: [
+                            false,
+                            noSharesRaw,
+                        ],
+                    })
+                    : Promise.resolve(
+                        [
+                            0n,
+                            0n,
+                        ] as const,
+                    ),
+            ]);
+
+        const [
+            yesUsdcOutRaw,
+        ] =
+            yesPreview;
+
+        const [
+            noUsdcOutRaw,
+        ] =
+            noPreview;
+
+        const yesCurrentValue =
+            Number(
+                formatUnits(
+                    yesUsdcOutRaw,
+                    6,
+                ),
+            );
+
+        const noCurrentValue =
+            Number(
+                formatUnits(
+                    noUsdcOutRaw,
+                    6,
+                ),
+            );
+
+        /*
+         * ------------------------------------------------
+         * 3. Use indexed history for cost accounting
+         * ------------------------------------------------
+         *
+         * Blockchain balances tell us WHAT the user owns.
+         *
+         * Indexed trade history tells us HOW MUCH
+         * they paid for it.
+         */
+        const indexed =
+            await this.redis.getJson<
+                MarketActivity[]
+            >(
+                `market-activity:indexed:${normalizedMarket}`,
+            ) ?? [];
+
+        const trades =
+            indexed
+                .filter(
+                    (
+                        activity,
+                    ) =>
+                        activity.trader
+                            .toLowerCase() ===
+                        normalizedWallet,
+                )
+                .sort(
+                    (
+                        first,
+                        second,
+                    ) => {
+                        if (
+                            first.blockNumber !==
+                            second.blockNumber
+                        ) {
+                            return (
+                                first.blockNumber -
+                                second.blockNumber
+                            );
+                        }
+
+                        return (
+                            first.timestamp.localeCompare(
+                                second.timestamp,
+                            )
+                        );
+                    },
+                );
+
+        type CostState = {
+            shares:
+            number;
+
+            costBasis:
+            number;
+
+            realizedPnl:
+            number;
+        };
+
+        const yesCost:
+            CostState = {
+            shares:
+                0,
+
+            costBasis:
+                0,
+
+            realizedPnl:
+                0,
+        };
+
+        const noCost:
+            CostState = {
+            shares:
+                0,
+
+            costBasis:
+                0,
+
+            realizedPnl:
+                0,
+        };
+
+        for (
+            const trade
+            of trades
+        ) {
+            const state =
+                trade.side ===
+                    "YES"
+                    ? yesCost
+                    : noCost;
+
+            if (
+                trade.action ===
+                "BUY"
+            ) {
+                state.shares +=
+                    trade.shares;
+
+                state.costBasis +=
+                    trade.usdcAmount;
+
+                continue;
+            }
+
+            /*
+             * SELL:
+             * remove cost basis using weighted
+             * average acquisition cost.
+             */
+            if (
+                state.shares <=
+                0
+            ) {
+                continue;
+            }
+
+            const averageCost =
+                state.costBasis /
+                state.shares;
+
+            const sharesSold =
+                Math.min(
+                    trade.shares,
+                    state.shares,
+                );
+
+            const removedCost =
+                sharesSold *
+                averageCost;
+
+            state.shares -=
+                sharesSold;
+
+            state.costBasis -=
+                removedCost;
+
+            state.realizedPnl +=
+                trade.usdcAmount -
+                removedCost;
+
+            if (
+                state.shares <
+                0.000001
+            ) {
+                state.shares =
+                    0;
+
+                state.costBasis =
+                    0;
+            }
+        }
+        const buildPosition = (
+            side:
+                "YES"
+                | "NO",
+
+            authoritativeShares:
+                number,
+
+            state:
+                CostState,
+
+            currentValueUsdc:
+                number,
+
+            currentPrice:
+                number,
+        ) => {
+            /*
+             * Cost basis should normally correspond
+             * to the authoritative balance once the
+             * indexer is caught up.
+             */
+            const costBasis =
+                state.costBasis;
+
+            /*
+             * Acquisition cost per CPMM share.
+             *
+             * Note: this is NOT necessarily the same
+             * thing as implied probability.
+             */
+            const avgEntry =
+                authoritativeShares >
+                    0 &&
+                    costBasis >
+                    0
+                    ? costBasis /
+                    authoritativeShares
+                    : 0;
+
+            const unrealizedPnlUsdc =
+                currentValueUsdc -
+                costBasis;
+
+            const unrealizedPnlPercent =
+                costBasis >
+                    0
+                    ? (
+                        unrealizedPnlUsdc /
+                        costBasis
+                    ) *
+                    100
+                    : 0;
+
+            return {
+                side,
+
+                shares:
+                    authoritativeShares,
+
+                avgEntry,
+
+                currentPrice,
+
+                costBasisUsdc:
+                    costBasis,
+
+                currentValueUsdc,
+
+                unrealizedPnlUsdc,
+
+                unrealizedPnlPercent,
+
+                realizedPnlUsdc:
+                    state.realizedPnl,
+            };
+        };
+
+        const yesPosition =
+            buildPosition(
+                "YES",
+
+                yesShares,
+
+                yesCost,
+
+                yesCurrentValue,
+
+                market.yesPrice,
+            );
+
+        const noPosition =
+            buildPosition(
+                "NO",
+
+                noShares,
+
+                noCost,
+
+                noCurrentValue,
+
+                market.noPrice,
+            );
+
+        return {
+            marketAddress:
+                market.address,
+
+            wallet:
+                walletAddress,
+
+            yes:
+                yesPosition,
+
+            no:
+                noPosition,
+
+            totalCurrentValueUsdc:
+                yesPosition
+                    .currentValueUsdc +
+                noPosition
+                    .currentValueUsdc,
+
+            totalUnrealizedPnlUsdc:
+                yesPosition
+                    .unrealizedPnlUsdc +
+                noPosition
+                    .unrealizedPnlUsdc,
+
+            totalRealizedPnlUsdc:
+                yesPosition
+                    .realizedPnlUsdc +
+                noPosition
+                    .realizedPnlUsdc,
+        };
+    }
+
+
+    async getAgentDecisions(
+        address: string,
+        limit =
+            20,
+    ): Promise<MarketAgentDecision[]> {
+        if (
+            !/^0x[a-fA-F0-9]{40}$/.test(
+                address,
+            )
+        ) {
+            throw new NotFoundException({
+                code:
+                    "MARKET_NOT_FOUND",
+
+                message:
+                    "Market not found.",
+            });
+        }
+
+        const safeLimit =
+            Math.min(
+                Math.max(
+                    limit,
+                    1,
+                ),
+                50,
+            );
+
+        const {
+            data,
+            error,
+        } =
+            await this.supabase.db
+                .from(
+                    "agent_runs",
+                )
+                .select(`
+                id,
+                agent_wallet_id,
+                agent_id,
+                profile_id,
+                market_address,
+                market_question,
+                status,
+                research,
+                estimate,
+                decision,
+                execution_receipt_id,
+                created_at,
+                completed_at,
+                agent_wallets (
+                    agent_name
+                ),
+                execution_receipts (
+                    trade_transaction_hash
+                )
+            `)
+                .eq(
+                    "market_address",
+                    address.toLowerCase(),
+                )
+                .order(
+                    "created_at",
+                    {
+                        ascending:
+                            false,
+                    },
+                )
+                .limit(
+                    safeLimit,
+                );
+
+        if (error) {
+            throw new Error(
+                `Failed to load market agent decisions: ${error.message}`,
+            );
+        }
+
+        return (
+            data ?? []
+        )
+            .filter(
+                (
+                    row,
+                ) =>
+                    row.decision,
+            )
+            .map(
+                (
+                    row,
+                ) => {
+                    const decision =
+                        row.decision as {
+                            action?:
+                            | "BUY_YES"
+                            | "BUY_NO"
+                            | "PASS";
+
+                            probability?:
+                            number;
+
+                            marketProbability?:
+                            number;
+
+                            edge?:
+                            number;
+
+                            confidence?:
+                            number;
+
+                            amountUsdc?:
+                            number;
+
+                            reasoning?:
+                            string;
+                        };
+
+                    const estimate =
+                        row.estimate as {
+                            keyFactors?:
+                            string[];
+
+                            risks?:
+                            string[];
+                        } | null;
+
+                    const research =
+                        row.research as {
+                            summary?:
+                            string;
+                        } | null;
+
+                    const walletRelation =
+                        Array.isArray(
+                            row.agent_wallets,
+                        )
+                            ? row
+                                .agent_wallets[
+                            0
+                            ]
+                            : row.agent_wallets;
+
+                    const receiptRelation =
+                        Array.isArray(
+                            row.execution_receipts,
+                        )
+                            ? row
+                                .execution_receipts[
+                            0
+                            ]
+                            : row.execution_receipts;
+
+                    return {
+                        id:
+                            row.id,
+
+                        agentWalletId:
+                            row.agent_wallet_id,
+
+                        agentId:
+                            row.agent_id ??
+                            null,
+
+                        agentName:
+                            walletRelation
+                                ?.agent_name ??
+                            null,
+
+                        profileId:
+                            row.profile_id,
+
+                        marketAddress:
+                            row.market_address,
+
+                        marketQuestion:
+                            row.market_question,
+
+                        status:
+                            row.status,
+
+                        action:
+                            decision.action ??
+                            "PASS",
+
+                        probability:
+                            Number(
+                                decision.probability ??
+                                0.5,
+                            ),
+
+                        marketProbability:
+                            Number(
+                                decision.marketProbability ??
+                                0.5,
+                            ),
+
+                        edge:
+                            Number(
+                                decision.edge ??
+                                0,
+                            ),
+
+                        confidence:
+                            Number(
+                                decision.confidence ??
+                                0,
+                            ),
+
+                        amountUsdc:
+                            Number(
+                                decision.amountUsdc ??
+                                0,
+                            ),
+
+                        reasoning:
+                            decision.reasoning ??
+                            "No reasoning supplied.",
+
+                        researchSummary:
+                            research?.summary ??
+                            null,
+
+                        keyFactors:
+                            estimate
+                                ?.keyFactors ??
+                            [],
+
+                        risks:
+                            estimate
+                                ?.risks ??
+                            [],
+
+                        transactionHash:
+                            receiptRelation
+                                ?.trade_transaction_hash ??
+                            null,
+
+                        createdAt:
+                            row.created_at,
+
+                        completedAt:
+                            row.completed_at ??
+                            null,
+                    };
+                },
+            );
     }
 
     private async readMarketCached(

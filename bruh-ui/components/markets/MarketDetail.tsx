@@ -28,12 +28,20 @@ import {
 
 import {
     getMarketActivity,
+    getMarketPortfolio,
     getMarketPriceHistory,
     getPublicMarket,
-    type MarketActivity,
-    type MarketPricePoint,
-    type PublicMarket,
     confirmMarketActivity,
+    getMarketStats,
+    getMarketAgentDecisions,
+
+    type MarketActivity,
+    type MarketPortfolio,
+    type MarketPosition,
+    type MarketPricePoint,
+    type MarketStats,
+    type PublicMarket,
+    type MarketAgentDecision,
 } from "@/src/lib/api";
 
 import {
@@ -128,32 +136,7 @@ type Trade = {
     txHash: `0x${string}`;
 };
 
-type ReasoningItem = {
-    agent: string;
-    title: string;
-    description: string;
-    confidence: number;
-    time: string;
-};
 
-const REASONING: ReasoningItem[] = [
-    {
-        agent: "Newshound",
-        title: "Momentum strengthened",
-        description:
-            "Recent ETF inflows, derivative positioning, and positive market sentiment increased the short-term probability estimate.",
-        confidence: 78,
-        time: "2m ago",
-    },
-    {
-        agent: "Actuary",
-        title: "Base rate remains cautious",
-        description:
-            "Historical Friday close distributions still imply meaningful downside risk despite recent momentum.",
-        confidence: 66,
-        time: "6m ago",
-    },
-];
 
 const CATEGORY_THEMES = {
     Crypto: {
@@ -477,6 +460,30 @@ export default function MarketDetail({
         setRecentTrades,
     ] = useState<Trade[]>([]);
 
+    const [
+        marketStats,
+        setMarketStats,
+    ] =
+        useState<
+            MarketStats | null
+        >(null);
+
+    const [
+        portfolio,
+        setPortfolio,
+    ] =
+        useState<
+            MarketPortfolio | null
+        >(null);
+
+    const [
+        agentDecisions,
+        setAgentDecisions,
+    ] =
+        useState<
+            MarketAgentDecision[]
+        >([]);
+
     const publicClient =
         usePublicClient({
             chainId:
@@ -499,7 +506,11 @@ export default function MarketDetail({
 
 
 
-
+    const [
+        agentDecisionsLoading,
+        setAgentDecisionsLoading,
+    ] =
+        useState(true);
 
     const isArcTestnet =
         chainId ===
@@ -689,6 +700,394 @@ export default function MarketDetail({
             window.setInterval(
                 () => {
                     void loadActivity();
+                },
+                30_000,
+            );
+
+        return () => {
+            cancelled =
+                true;
+
+            window.clearInterval(
+                interval,
+            );
+        };
+    }, [
+        marketId,
+    ]);
+
+    useEffect(() => {
+        const apiUrl =
+            process.env.NEXT_PUBLIC_API_URL ??
+            "http://localhost:3001/api";
+
+        const source =
+            new EventSource(
+                `${apiUrl}/markets/${marketId}/stream`,
+            );
+
+        source.onmessage = (
+            event,
+        ) => {
+            try {
+                const message =
+                    JSON.parse(
+                        event.data,
+                    ) as {
+                        type:
+                        | "MARKET_TRADE"
+                        | "HEARTBEAT";
+
+                        source?:
+                        | "pending"
+                        | "indexed";
+
+                        activity?:
+                        MarketActivity;
+                    };
+
+                if (
+                    message.type !==
+                    "MARKET_TRADE" ||
+                    !message.activity
+                ) {
+                    return;
+                }
+
+                const activity =
+                    message.activity;
+
+
+                if (
+                    message.source ===
+                    "indexed" &&
+                    address
+                ) {
+                    void getMarketPortfolio(
+                        marketId,
+                        address,
+                    )
+                        .then(
+                            (
+                                result,
+                            ) => {
+                                setPortfolio(
+                                    result,
+                                );
+                            },
+                        )
+                        .catch(
+                            (
+                                error,
+                            ) => {
+                                console.error(
+                                    "Failed to refresh portfolio after indexed trade:",
+                                    error,
+                                );
+                            },
+                        );
+                }
+                /*
+                 * Update Activity feed.
+                 *
+                 * Dedupe by transaction hash so
+                 * pending -> indexed replacement
+                 * doesn't create duplicate rows.
+                 */
+                setMarketActivity(
+                    (
+                        current,
+                    ) => {
+                        const withoutSameTx =
+                            current.filter(
+                                (
+                                    item,
+                                ) =>
+                                    item.transactionHash
+                                        .toLowerCase() !==
+                                    activity.transactionHash
+                                        .toLowerCase(),
+                            );
+
+                        return [
+                            activity,
+                            ...withoutSameTx,
+                        ].sort(
+                            (
+                                first,
+                                second,
+                            ) =>
+                                new Date(
+                                    second.timestamp,
+                                ).getTime() -
+                                new Date(
+                                    first.timestamp,
+                                ).getTime(),
+                        );
+                    },
+                );
+
+                /*
+                 * Update chart immediately.
+                 *
+                 * Ignore pending chart points with
+                 * blockNumber 0 if you prefer only
+                 * authoritative points. For now,
+                 * we'll still show them immediately.
+                 */
+                setPriceHistory(
+                    (
+                        current,
+                    ) => {
+                        const withoutSameTrade =
+                            current.filter(
+                                (
+                                    point,
+                                ) =>
+                                    !(
+                                        point.timestamp ===
+                                        activity.timestamp &&
+                                        point.eventType ===
+                                        activity.action
+                                    ),
+                            );
+
+                        const nextPoint:
+                            MarketPricePoint = {
+                            blockNumber:
+                                activity.blockNumber,
+
+                            timestamp:
+                                activity.timestamp,
+
+                            yesPrice:
+                                activity.yesPrice,
+
+                            noPrice:
+                                activity.noPrice,
+
+                            eventType:
+                                activity.action,
+                        };
+
+                        return [
+                            ...withoutSameTrade,
+                            nextPoint,
+                        ].sort(
+                            (
+                                first,
+                                second,
+                            ) =>
+                                new Date(
+                                    first.timestamp,
+                                ).getTime() -
+                                new Date(
+                                    second.timestamp,
+                                ).getTime(),
+                        );
+                    },
+                );
+            } catch (error) {
+                console.error(
+                    "Failed to process market stream event:",
+                    error,
+                );
+            }
+        };
+
+        source.onerror = (
+            error,
+        ) => {
+            console.error(
+                "Market stream error:",
+                error,
+            );
+        };
+
+        return () => {
+            source.close();
+        };
+    }, [
+        marketId,
+        address,
+    ]);
+
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadStats() {
+            try {
+                const stats =
+                    await getMarketStats(
+                        marketId,
+                    );
+
+                if (!cancelled) {
+                    setMarketStats(
+                        stats,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load market stats:",
+                    error,
+                );
+            }
+        }
+
+        void loadStats();
+
+        const interval =
+            window.setInterval(
+                () => {
+                    void loadStats();
+                },
+                30_000,
+            );
+
+        return () => {
+            cancelled =
+                true;
+
+            window.clearInterval(
+                interval,
+            );
+        };
+    }, [
+        marketId,
+    ]);
+
+    useEffect(() => {
+        if (
+            !address ||
+            !isConnected ||
+            !isArcTestnet
+        ) {
+            setPortfolio(
+                null,
+            );
+
+            return;
+        }
+
+        /*
+         * Capture the narrowed address.
+         *
+         * TypeScript now knows this can
+         * never be undefined inside the
+         * async function below.
+         */
+        const walletAddress =
+            address;
+
+        let cancelled =
+            false;
+
+        async function loadPortfolio() {
+            try {
+                const result =
+                    await getMarketPortfolio(
+                        marketId,
+                        walletAddress,
+                    );
+
+                if (!cancelled) {
+                    setPortfolio(
+                        result,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load market portfolio:",
+                    error,
+                );
+            }
+        }
+
+        void loadPortfolio();
+
+        const interval =
+            window.setInterval(
+                () => {
+                    void loadPortfolio();
+                },
+                30_000,
+            );
+
+        return () => {
+            cancelled =
+                true;
+
+            window.clearInterval(
+                interval,
+            );
+        };
+    }, [
+        marketId,
+        address,
+        isConnected,
+        isArcTestnet,
+    ]);
+
+    useEffect(() => {
+        let cancelled =
+            false;
+
+        async function loadAgentDecisions() {
+            try {
+                const decisions =
+                    await getMarketAgentDecisions(
+                        marketId,
+                        30,
+                    );
+
+                if (!cancelled) {
+                    /*
+                     * Show final ensemble decisions
+                     * in the primary feed.
+                     *
+                     * Newshound / Actuary remain
+                     * available in the API and can
+                     * later become expandable detail.
+                     */
+                    const ensembleDecisions =
+                        decisions.filter(
+                            (
+                                decision,
+                            ) =>
+                                decision.profileId ===
+                                "ensemble",
+                        );
+
+                    setAgentDecisions(
+                        ensembleDecisions,
+                    );
+                }
+            } catch (error) {
+                console.error(
+                    "Failed to load agent decisions:",
+                    error,
+                );
+            } finally {
+                if (!cancelled) {
+                    setAgentDecisionsLoading(
+                        false,
+                    );
+                }
+            }
+        }
+
+        void loadAgentDecisions();
+
+        /*
+         * Temporary fallback until we push
+         * agent decisions through SSE.
+         */
+        const interval =
+            window.setInterval(
+                () => {
+                    void loadAgentDecisions();
                 },
                 30_000,
             );
@@ -1132,6 +1531,8 @@ export default function MarketDetail({
                 refetchAllowance(),
             ]);
 
+
+
             const [
                 refreshedMarket,
                 refreshedHistory,
@@ -1416,37 +1817,42 @@ export default function MarketDetail({
                         <section className="mt-9 grid gap-4 sm:grid-cols-4">
                             <MetricCard
                                 icon={WalletCards}
-                                label="Collateral"
+                                label="Liquidity"
                                 value={`${formatMoney(
+                                    marketStats?.liquidityUsdc ??
                                     market.collateralUsdc,
                                 )} USDC`}
                             />
 
                             <MetricCard
-                                icon={TrendingUp}
-                                label="YES shares"
-                                value={formatMoney(
-                                    market.totalSharesYes,
-                                )}
+                                icon={ArrowUpRight}
+                                label="Volume"
+                                value={`${formatMoney(
+                                    marketStats?.totalVolumeUsdc ??
+                                    0,
+                                )} USDC`}
                             />
 
                             <MetricCard
-                                icon={TrendingDown}
-                                label="NO shares"
-                                value={formatMoney(
-                                    market.totalSharesNo,
-                                )}
+                                icon={Users}
+                                label="Trades"
+                                value={
+                                    marketStats?.tradeCount.toString() ??
+                                    "0"
+                                }
                             />
 
                             <MetricCard
                                 icon={ShieldCheck}
                                 label="Trading fee"
                                 value={`${(
-                                    market.feeBps /
-                                    100
+                                    market.feeBps / 100
                                 ).toFixed(2)}%`}
                             />
                         </section>
+
+
+
 
                         <section
                             className="mt-8 overflow-hidden rounded-[28px] border p-[2px]"
@@ -1630,6 +2036,12 @@ export default function MarketDetail({
                                 {activeTab === "reasoning" && (
                                     <ReasoningTab
                                         theme={theme}
+                                        decisions={
+                                            agentDecisions
+                                        }
+                                        loading={
+                                            agentDecisionsLoading
+                                        }
                                     />
                                 )}
                             </div>
@@ -1648,7 +2060,10 @@ export default function MarketDetail({
                                 boxShadow: `0 30px 70px -42px ${theme.glow}`,
                             }}
                         >
+
                             <div className="rounded-[26px] bg-[#fffdf8] p-5">
+
+
                                 <div className="flex items-center justify-between">
                                     <div>
                                         <p className="text-[8px] font-black uppercase tracking-[0.18em] text-slate-400">
@@ -1970,7 +2385,23 @@ export default function MarketDetail({
                                 </p>
                             </div>
                         </div>
+                        {isConnected &&
 
+                            isArcTestnet &&
+
+                            portfolio && (
+
+                                <PortfolioCard
+
+                                    portfolio={
+
+                                        portfolio
+
+                                    }
+
+                                />
+
+                            )}
                         <div className="mt-4 rounded-[22px] border border-black/10 bg-[#fffdf8]/80 p-4">
                             <div className="flex items-center gap-2">
                                 <ShieldCheck className="h-4 w-4 text-violet-600" />
@@ -2000,6 +2431,246 @@ export default function MarketDetail({
                 </section>
             </div>
         </main>
+    );
+}
+
+function PortfolioCard({
+    portfolio,
+}: {
+    portfolio:
+    MarketPortfolio;
+}) {
+    const hasYes =
+        portfolio.yes.shares >
+        0.000001;
+
+    const hasNo =
+        portfolio.no.shares >
+        0.000001;
+
+    const hasPosition =
+        hasYes ||
+        hasNo;
+
+    const totalPnlPositive =
+        portfolio
+            .totalUnrealizedPnlUsdc >=
+        0;
+
+    return (
+        <div className="mt-4 rounded-[22px] border border-black/10 bg-[#fffdf8]/80 p-4">
+            <div className="flex items-center justify-between">
+                <div>
+                    <p className="text-[8px] font-black uppercase tracking-[0.16em] text-slate-400">
+                        Your position
+                    </p>
+
+                    <p className="mt-1 text-[11px] font-black text-slate-800">
+                        Current market exposure
+                    </p>
+                </div>
+
+                <WalletCards className="h-4 w-4 text-violet-600" />
+            </div>
+
+            {!hasPosition ? (
+                <div className="mt-4 rounded-[14px] border border-dashed border-black/10 bg-white/50 px-4 py-6 text-center">
+                    <p className="text-[10px] font-black text-slate-600">
+                        No open position
+                    </p>
+
+                    <p className="mt-1 text-[8px] font-medium text-slate-400">
+                        Buy YES or NO to start a position.
+                    </p>
+                </div>
+            ) : (
+                <>
+                    <div className="mt-4 grid grid-cols-2 gap-3">
+                        {hasYes && (
+                            <PositionCard
+                                label="YES"
+                                position={
+                                    portfolio.yes
+                                }
+                            />
+                        )}
+
+                        {hasNo && (
+                            <PositionCard
+                                label="NO"
+                                position={
+                                    portfolio.no
+                                }
+                            />
+                        )}
+                    </div>
+
+                    <div className="mt-4 border-t border-black/5 pt-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase tracking-[0.13em] text-slate-400">
+                                Portfolio value
+                            </span>
+
+                            <span className="font-mono text-[12px] font-black text-slate-800">
+                                $
+                                {portfolio
+                                    .totalCurrentValueUsdc
+                                    .toFixed(
+                                        2,
+                                    )}
+                            </span>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between">
+                            <span className="text-[8px] font-black uppercase tracking-[0.13em] text-slate-400">
+                                Unrealized PnL
+                            </span>
+
+                            <span
+                                className={`font-mono text-[12px] font-black ${totalPnlPositive
+                                    ? "text-emerald-600"
+                                    : "text-rose-600"
+                                    }`}
+                            >
+                                {totalPnlPositive
+                                    ? "+"
+                                    : ""}
+                                $
+                                {portfolio
+                                    .totalUnrealizedPnlUsdc
+                                    .toFixed(
+                                        2,
+                                    )}
+                            </span>
+                        </div>
+                    </div>
+                </>
+            )}
+        </div>
+    );
+}
+
+function PositionCard({
+    label,
+    position,
+}: {
+    label:
+    | "YES"
+    | "NO";
+
+    position:
+    MarketPosition;
+}) {
+    const pnlPositive =
+        position
+            .unrealizedPnlUsdc >=
+        0;
+
+    const isYes =
+        label ===
+        "YES";
+
+    return (
+        <div
+            className={`rounded-[15px] border p-3 ${isYes
+                ? "border-emerald-200 bg-emerald-50/70"
+                : "border-rose-200 bg-rose-50/70"
+                }`}
+        >
+            <div className="flex items-center justify-between">
+                <span
+                    className={`text-[8px] font-black uppercase tracking-[0.14em] ${isYes
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                        }`}
+                >
+                    {label}
+                </span>
+
+                <span
+                    className={`font-mono text-[8px] font-black ${pnlPositive
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                        }`}
+                >
+                    {pnlPositive
+                        ? "+"
+                        : ""}
+                    {position
+                        .unrealizedPnlPercent
+                        .toFixed(
+                            1,
+                        )}
+                    %
+                </span>
+            </div>
+
+            <p className="mt-2 font-mono text-[16px] font-black text-slate-900">
+                {position.shares.toFixed(
+                    2,
+                )}
+            </p>
+
+            <p className="mt-0.5 text-[7px] font-black uppercase tracking-[0.12em] text-slate-400">
+                shares
+            </p>
+
+            <div className="mt-3 space-y-2 border-t border-black/5 pt-3">
+                <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-semibold text-slate-400">
+                        Avg entry
+                    </span>
+
+                    <span className="font-mono text-[9px] font-black text-slate-700">
+                        {(
+                            position.avgEntry *
+                            100
+                        ).toFixed(
+                            1,
+                        )}
+                        ¢
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-semibold text-slate-400">
+                        Exit value
+                    </span>
+
+                    <span className="font-mono text-[9px] font-black text-slate-700">
+                        $
+                        {position
+                            .currentValueUsdc
+                            .toFixed(
+                                2,
+                            )}
+                    </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                    <span className="text-[8px] font-semibold text-slate-400">
+                        PnL
+                    </span>
+
+                    <span
+                        className={`font-mono text-[9px] font-black ${pnlPositive
+                            ? "text-emerald-600"
+                            : "text-rose-600"
+                            }`}
+                    >
+                        {pnlPositive
+                            ? "+"
+                            : ""}
+                        $
+                        {position
+                            .unrealizedPnlUsdc
+                            .toFixed(
+                                2,
+                            )}
+                    </span>
+                </div>
+            </div>
+        </div>
     );
 }
 
@@ -2404,7 +3075,7 @@ function MetricCard({
     value: string;
 }) {
     return (
-        <div className="rounded-[18px] border border-black/10 bg-[#fffdf8]/75 p-4 backdrop-blur-md">
+        <div className="rounded-[16px] border border-black/10 bg-[#fffdf8]/80 px-4 py-3.5 backdrop-blur-md">
             <div className="flex items-center gap-2">
                 <Icon className="h-3.5 w-3.5 text-violet-600" />
 
@@ -2643,60 +3314,339 @@ function ActivityTab({
 
 function ReasoningTab({
     theme,
+    decisions,
+    loading,
 }: {
-    theme: (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
+    theme:
+    (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
+
+    decisions:
+    MarketAgentDecision[];
+
+    loading:
+    boolean;
 }) {
+    if (loading) {
+        return (
+            <div className="grid gap-4">
+                {Array.from({
+                    length: 3,
+                }).map(
+                    (
+                        _,
+                        index,
+                    ) => (
+                        <div
+                            key={
+                                index
+                            }
+                            className="h-48 animate-pulse rounded-[22px] border border-black/10 bg-[#fffdf8]/75"
+                        />
+                    ),
+                )}
+            </div>
+        );
+    }
+
+    if (
+        decisions.length ===
+        0
+    ) {
+        return (
+            <div className="rounded-[22px] border border-dashed border-black/10 bg-[#fffdf8]/75 px-6 py-12 text-center">
+                <BrainCircuit className="mx-auto h-6 w-6 text-slate-300" />
+
+                <p className="mt-4 text-[12px] font-black text-slate-700">
+                    No agent decisions yet
+                </p>
+
+                <p className="mt-2 text-[10px] font-medium leading-5 text-slate-400">
+                    Autonomous agent analysis will appear here.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="grid gap-4">
-            {REASONING.map((item) => (
-                <article
-                    key={`${item.agent}-${item.time}`}
-                    className="rounded-[22px] border border-black/10 bg-[#fffdf8]/75 p-5"
-                >
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <div
-                                className="flex h-10 w-10 items-center justify-center rounded-[13px]"
-                                style={{
-                                    background: theme.soft,
-                                    color: theme.text,
-                                }}
-                            >
-                                <BrainCircuit className="h-4.5 w-4.5" />
-                            </div>
+            {decisions.map(
+                (
+                    decision,
+                ) => (
+                    <AgentDecisionCard
+                        key={
+                            decision.id
+                        }
+                        decision={
+                            decision
+                        }
+                        theme={
+                            theme
+                        }
+                    />
+                ),
+            )}
+        </div>
+    );
+}
 
-                            <div>
-                                <p className="text-[11px] font-black text-slate-800">
-                                    {item.agent}
-                                </p>
+function AgentDecisionCard({
+    decision,
+    theme,
+}: {
+    decision:
+    MarketAgentDecision;
 
-                                <p className="mt-1 text-[8px] font-semibold text-slate-400">
-                                    {item.time}
-                                </p>
-                            </div>
-                        </div>
+    theme:
+    (typeof CATEGORY_THEMES)[keyof typeof CATEGORY_THEMES];
+}) {
+    const isBuyYes =
+        decision.action ===
+        "BUY_YES";
 
-                        <span
-                            className="rounded-full border px-3 py-1.5 font-mono text-[8px] font-black"
-                            style={{
-                                borderColor: theme.border,
-                                background: theme.soft,
-                                color: theme.text,
-                            }}
-                        >
-                            {item.confidence}% confidence
-                        </span>
+    const isBuyNo =
+        decision.action ===
+        "BUY_NO";
+
+    const isPass =
+        decision.action ===
+        "PASS";
+
+    const actionLabel =
+        isBuyYes
+            ? "BUY YES"
+            : isBuyNo
+                ? "BUY NO"
+                : "PASS";
+
+    const actionClasses =
+        isBuyYes
+            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+            : isBuyNo
+                ? "border-rose-200 bg-rose-50 text-rose-700"
+                : "border-slate-200 bg-slate-50 text-slate-600";
+
+    const edgePositive =
+        decision.edge >=
+        0;
+
+    return (
+        <article className="rounded-[22px] border border-black/10 bg-[#fffdf8]/80 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                <div className="flex items-center gap-3">
+                    <div
+                        className="flex h-11 w-11 items-center justify-center rounded-[14px]"
+                        style={{
+                            background:
+                                theme.soft,
+
+                            color:
+                                theme.text,
+                        }}
+                    >
+                        <Bot className="h-5 w-5" />
                     </div>
 
-                    <h3 className="mt-5 text-[17px] font-black tracking-[-0.025em] text-slate-900">
-                        {item.title}
-                    </h3>
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <p className="text-[12px] font-black text-slate-900">
+                                {decision.agentName ??
+                                    "Autonomous agent"}
+                            </p>
 
-                    <p className="mt-3 text-[11px] font-medium leading-[1.7] text-slate-500">
-                        {item.description}
+                            <span className="rounded-full border border-violet-200 bg-violet-50 px-2 py-1 text-[6px] font-black uppercase tracking-[0.14em] text-violet-600">
+                                {decision.profileId}
+                            </span>
+                        </div>
+
+                        <p className="mt-1 font-mono text-[8px] font-semibold text-slate-400">
+                            {new Date(
+                                decision.createdAt,
+                            ).toLocaleString(
+                                [],
+                                {
+                                    month:
+                                        "short",
+
+                                    day:
+                                        "numeric",
+
+                                    hour:
+                                        "2-digit",
+
+                                    minute:
+                                        "2-digit",
+                                },
+                            )}
+                        </p>
+                    </div>
+                </div>
+
+                <span
+                    className={`self-start rounded-full border px-3 py-1.5 text-[8px] font-black uppercase tracking-[0.13em] ${actionClasses}`}
+                >
+                    {actionLabel}
+                </span>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <AgentMetric
+                    label="Agent probability"
+                    value={`${(
+                        decision.probability *
+                        100
+                    ).toFixed(
+                        1,
+                    )}%`}
+                />
+
+                <AgentMetric
+                    label="Market"
+                    value={`${(
+                        decision.marketProbability *
+                        100
+                    ).toFixed(
+                        1,
+                    )}%`}
+                />
+
+                <AgentMetric
+                    label="Edge"
+                    value={`${edgePositive
+                        ? "+"
+                        : ""
+                        }${(
+                            decision.edge *
+                            100
+                        ).toFixed(
+                            1,
+                        )}%`}
+                    positive={
+                        edgePositive
+                    }
+                />
+
+                <AgentMetric
+                    label="Confidence"
+                    value={`${(
+                        decision.confidence *
+                        100
+                    ).toFixed(
+                        1,
+                    )}%`}
+                />
+            </div>
+
+            <div className="mt-5 rounded-[16px] border border-black/5 bg-white/60 p-4">
+                <div className="flex items-center gap-2">
+                    <BrainCircuit
+                        className="h-3.5 w-3.5"
+                        style={{
+                            color:
+                                theme.text,
+                        }}
+                    />
+
+                    <p className="text-[8px] font-black uppercase tracking-[0.14em] text-slate-500">
+                        Reasoning
                     </p>
-                </article>
-            ))}
+                </div>
+
+                <p className="mt-3 text-[11px] font-medium leading-[1.75] text-slate-600">
+                    {decision.reasoning}
+                </p>
+            </div>
+
+            {decision.researchSummary && (
+                <div className="mt-3 rounded-[14px] border border-black/5 bg-slate-50/70 p-3">
+                    <p className="text-[7px] font-black uppercase tracking-[0.14em] text-slate-400">
+                        Research
+                    </p>
+
+                    <p className="mt-2 text-[9px] font-medium leading-5 text-slate-500">
+                        {
+                            decision.researchSummary
+                        }
+                    </p>
+                </div>
+            )}
+
+            {!isPass &&
+                decision.amountUsdc >
+                0 && (
+                    <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-4">
+                        <div>
+                            <p className="text-[7px] font-black uppercase tracking-[0.14em] text-slate-400">
+                                Trade size
+                            </p>
+
+                            <p className="mt-1 font-mono text-[11px] font-black text-slate-800">
+                                {decision.amountUsdc.toFixed(
+                                    2,
+                                )}{" "}
+                                USDC
+                            </p>
+                        </div>
+
+                        {decision.transactionHash && (
+                            <a
+                                href={`${ARC_TESTNET_EXPLORER}/tx/${decision.transactionHash}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1.5 text-[8px] font-black text-violet-600 transition-colors hover:text-violet-800"
+                            >
+                                View trade
+
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                        )}
+                    </div>
+                )}
+
+            {isPass && (
+                <div className="mt-4 flex items-center gap-2 border-t border-black/5 pt-4">
+                    <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
+
+                    <p className="text-[8px] font-semibold text-slate-400">
+                        No trade executed — insufficient actionable edge.
+                    </p>
+                </div>
+            )}
+        </article>
+    );
+}
+
+function AgentMetric({
+    label,
+    value,
+    positive,
+}: {
+    label:
+    string;
+
+    value:
+    string;
+
+    positive?:
+    boolean;
+}) {
+    return (
+        <div className="rounded-[13px] border border-black/5 bg-white/70 p-3">
+            <p className="text-[7px] font-black uppercase tracking-[0.12em] text-slate-400">
+                {label}
+            </p>
+
+            <p
+                className={`mt-2 font-mono text-[12px] font-black ${positive ===
+                    undefined
+                    ? "text-slate-800"
+                    : positive
+                        ? "text-emerald-600"
+                        : "text-rose-600"
+                    }`}
+            >
+                {value}
+            </p>
         </div>
     );
 }

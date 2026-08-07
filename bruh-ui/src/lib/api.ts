@@ -330,6 +330,101 @@ export type MarketActivity = {
     noPrice: number;
 };
 
+
+export type MarketStats = {
+    liquidityUsdc: number;
+    totalVolumeUsdc: number;
+
+    yesPrice: number;
+    noPrice: number;
+
+    yesShares: number;
+    noShares: number;
+
+    tradeCount: number;
+};
+
+
+export type MarketPosition = {
+    side: "YES" | "NO";
+
+    shares: number;
+
+    avgEntry: number;
+
+    currentPrice: number;
+
+    costBasisUsdc: number;
+
+    currentValueUsdc: number;
+
+    unrealizedPnlUsdc: number;
+
+    unrealizedPnlPercent: number;
+
+    realizedPnlUsdc: number;
+};
+
+export type MarketPortfolio = {
+    marketAddress: `0x${string}`;
+
+    wallet: `0x${string}`;
+
+    yes: MarketPosition;
+
+    no: MarketPosition;
+
+    totalCurrentValueUsdc: number;
+
+    totalUnrealizedPnlUsdc: number;
+
+    totalRealizedPnlUsdc: number;
+};
+
+export type MarketAgentDecision = {
+    id: string;
+
+    agentWalletId: string;
+    agentId: string | null;
+    agentName: string | null;
+
+    profileId: string;
+
+    marketAddress: string;
+    marketQuestion: string;
+
+    status: string;
+
+    action:
+    | "BUY_YES"
+    | "BUY_NO"
+    | "PASS";
+
+    probability: number;
+    marketProbability: number;
+
+    edge: number;
+    confidence: number;
+
+    amountUsdc: number;
+
+    reasoning: string;
+
+    researchSummary:
+    string | null;
+
+    keyFactors: string[];
+    risks: string[];
+
+    transactionHash:
+    string | null;
+
+    createdAt: string;
+
+    completedAt:
+    string | null;
+};
+
 // export interface InstalledAgentRunResult {
 //     runId: string;
 //     customAgentId: string;
@@ -1106,6 +1201,71 @@ export async function confirmMarketActivity(
     if (!response.ok) {
         throw new Error(
             "Failed to persist confirmed market activity.",
+        );
+    }
+
+    return response.json();
+}
+
+export async function getMarketStats(
+    address: string,
+): Promise<MarketStats> {
+    const response =
+        await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/markets/${address}/stats`,
+            {
+                cache:
+                    "no-store",
+            },
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "Failed to load market stats.",
+        );
+    }
+
+    return response.json();
+}
+
+export async function getMarketPortfolio(
+    marketAddress: string,
+    walletAddress: string,
+): Promise<MarketPortfolio> {
+    const response =
+        await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/markets/${marketAddress}/portfolio/${walletAddress}`,
+            {
+                cache: "no-store",
+            },
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "Failed to load market portfolio.",
+        );
+    }
+
+    return response.json();
+}
+
+export async function getMarketAgentDecisions(
+    address: string,
+    limit =
+        20,
+): Promise<MarketAgentDecision[]> {
+    const response =
+        await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/markets/${address}/agents?limit=${limit}`,
+            {
+                cache:
+                    "no-store",
+            },
+        );
+
+    if (!response.ok) {
+        throw new Error(
+            "Failed to load market agent decisions.",
         );
     }
 

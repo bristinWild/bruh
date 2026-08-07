@@ -250,18 +250,9 @@ export class MarketActivitySchedulerService {
             latestBlock -
             fromBlock;
 
-        /*
-         * Two operating modes:
-         *
-         * 1. BACKFILL
-         *    We're still far behind.
-         *    Only process 250 blocks.
-         *
-         * 2. LIVE TAIL
-         *    We're close to the chain head.
-         *    Process everything through
-         *    latestBlock immediately.
-         */
+        let publishLiveEvents =
+            false;
+
         let toBlock:
             bigint;
 
@@ -269,6 +260,9 @@ export class MarketActivitySchedulerService {
             blocksBehind <=
             this.LIVE_TAIL_THRESHOLD
         ) {
+
+            publishLiveEvents =
+                true;
             toBlock =
                 latestBlock;
 
@@ -301,6 +295,7 @@ export class MarketActivitySchedulerService {
                 toBlock,
                 existingActivities ??
                 [],
+                publishLiveEvents,
             );
     }
 }
